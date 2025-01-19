@@ -1,0 +1,14 @@
+[project]
+name = "amber"
+version = "0.1.0"
+description = "Explicit, versioned, serialisation"
+readme = "README.md"
+authors = [
+    { name = "Tom Gillam", email = "tpgillam@googlemail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
