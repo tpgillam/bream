@@ -1,5 +1,14 @@
 # amber
-amber is an explictly versioned encode/decode library for JSON-like trees.
+`amber` is an explictly versioned encode/decode library for JSON-like trees.
+
+## Goals and non-goals
+`amber` aims to be the following:
+- Simple: encode to a human-readable JSON tree.
+- Explicit: no silent conversion. User-provided versions, easy upgrades.
+- Modular: bring-your-own codecs.
+
+It _does not_ aim to be:
+- Scalable: `amber` is (probably) very slow. Speed isn't a current design goal.
 
 ## Data structure
 A JSON tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
