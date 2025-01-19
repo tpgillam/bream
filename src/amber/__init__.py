@@ -63,23 +63,37 @@ def encode(
     }
 
 
-def _assert_valid_key(x: object) -> str:
+def _assert_valid_key(x: object) -> None:
     if not isinstance(x, str):
         msg = f"keys must be strings; got {x!r}"
         raise TypeError(msg)
     if x in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _FORMAT_VERSION_KEY, _PAYLOAD_KEY):
         msg = f"{x!r} is a reserved keyword that can't appear as a dictionary key."
         raise ValueError(msg)
-    return x
 
 
 def _encode(obj: object, format: SerialisationFormat) -> EncodeError | JsonType:
     if isinstance(obj, _JsonElement):
         return obj
 
+    # TODO: should this be hardcoded, or added as something registerable?
     if isinstance(obj, list):
-        return [encode(x, format) for x in obj]
+        result = []
+        for x in obj:
+            x_encoded = _encode(x, format)
+            if isinstance(x_encoded, EncodeError):
+                return x_encoded
+            result.append(x_encoded)
+        return result
 
+    # TODO: should this be hardcoded, or added as something registerable?
     if isinstance(obj, dict):
-        # TODO: Support non-string keys
-        return {_assert_valid_key(k): encode(v, format) for k, v in obj.items()}
+        result = {}
+        for k, v in obj.items():
+            # TODO: Support non-string keys
+            _assert_valid_key(k)
+            v_encoded = _encode(v, format)
+            if isinstance(v_encoded, EncodeError):
+                return v_encoded
+            result[k] = v_encoded
+        return result
