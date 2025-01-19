@@ -45,7 +45,11 @@ The version will be incremeneted whenever breaking changes are made to amber.
 
 
 def encode(obj: object, format: SerialisationFormat) -> dict[str, JsonType]:
-    return {_FORMAT_VERSION_KEY: format.version, _PAYLOAD_KEY: _encode(obj, format)}
+    return {
+        _AMBER_VERSION_KEY: AMBER_VERSION,
+        _FORMAT_VERSION_KEY: format.version,
+        _PAYLOAD_KEY: _encode(obj, format),
+    }
 
 
 def _assert_valid_key(x: object) -> str:
