@@ -27,3 +27,104 @@ reportPropertyTypeMismatch = true
 reportShadowedImports = true
 reportUninitializedInstanceVariable = true
 reportUnnecessaryTypeIgnoreComment = true
+
+
+[tool.ruff.format]
+docstring-code-format = true
+skip-magic-trailing-comma = true
+# Only allow `\n` line-endings (unix-style)
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+    # The order of the rules matches the ordering in the documentation: 
+    #   https://docs.astral.sh/ruff/rules/
+    "F",     # Pyflakes
+    "E",     # Pycodestyle (error)
+    "W",     # Pycodestyle (warning)
+    "I",     # isort
+    "N",     # pep8-naming - standard pythonic naming conventions.
+    "D",     # pydocstyle - docstring usage and formatting.
+    "UP",    # pyupgrade - avoid deprecated / old-style / superfluous code.
+    "YTT",   # flake8-2020
+    "ANN",   # flake8-annotations
+    "ASYNC", # flake8-async
+    "S",     # flake8-bandit
+    "BLE",   # flake8-blind-except - don't catch Exception
+    "FBT",   # flake8-boolean-trap
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins - don't shadow names built-in to the language
+    "C4",    # flake8-comprehensions - avoid unnecessary intermediate objects
+    "DTZ",   # flake8-datetimez
+    "T10",   # flake8-debugger - don't allow accidentally leaving debugger calls in
+    "DJ",    # flake8-django
+    "EM",    # flake8-errmsg
+    "EXE",   # flake8-executable
+    "FA",    # flake8-future-annotations
+    "ISC",   # flake8-implicit-str-concat
+    "ICN",   # flake8-import-conventions
+    "LOG",   # flake8-logging
+    "G",     # flake8-logging-format
+    "INP",   # flake8-no-pep420 - always use __init__.py
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "PYI",   # flake8-pyi - type-hinting best practices
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SLF",   # flake8-self - disallow private member access
+    "SLOT",  # flake8-slots
+    "SIM",   # flake8-simplify
+    "TID",   # flake8-tidy-imports
+    "TC",    # flake8-type-checking
+    "INT",   # flake8-gettext
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "TD004", # flake8-todos: missing colon
+    "TD005", # flake8-todos: missing description
+    "TD006", # flake8-todos: invalid capitalisation
+    "TD007", # flake8-todos: missing space after colon
+    "ERA",   # eradicate - commented-out code
+    "PD",    # pandas-vet
+    "PGH",   # pygrep-hooks
+    "PL",    # Pylint
+    "TRY",   # tryceratops
+    "FLY",   # flynt
+    "NPY",   # NumPy-specific
+    "FAST",  # FastAPI
+    "AIR",   # Airflow
+    "PERF",  # perflint
+    "FURB",  # refurb
+    # "DOC",   # pydoclint  # TODO: enable when out of preview
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    # pydocstyle
+    "D100", # module docstrings (in every file)
+    "D101", # docstring for every public class
+    "D102", # docstring for every public method
+    "D103", # docstring for every public function
+    "D104", # package docstrings (in __init__.py)
+    "D105", # docstring for every magic method
+    "D107", # docstring required for __init__ method
+    "D401", # first line of docstring must be imperative
+
+    # flake8-bandit
+    "S101", # this bans use of `assert`. We use it for sanity checking & tests
+
+    # Pylint
+    "PLR2004", # "magic value" suppression is a bit too eager, sadly.
+    "PLR0913", # We allow many keyword-only arguments.
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["amber"]
+required-imports = ["from __future__ import annotations"]
+split-on-trailing-comma = false
