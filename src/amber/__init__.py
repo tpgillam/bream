@@ -1,56 +1,98 @@
-from typing import NewType, Protocol
+import abc
+import dataclasses
+from typing import NewType
+import typing
 
 _JsonElement = bool | float | int | str | None
 type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
-
-class Coder(Protocol):
-    """Encapsulate encoding & decoding for a specific type."""
-
-    def decode(self, data: JsonType) -> object: ...
-    def encode(self, value: object) -> JsonType: ...
-
-
-class Decoder(Protocol):
-    def decode(self, data: JsonType) -> object: ...
-
-
 TypeLabel = NewType("TypeLabel", str)
 
-
-# TODO: frozen
-class SerialisationFormat:
-    version: int
-    """The current version of the serialisation format."""
-
-    # TODO: frozen
-    type_label_to_coder: dict[TypeLabel, Coder]
-    """A map from an object's class label to a `Coder`."""
-
-    breaking_version_type_label_to_compatibility_decoder: dict[
-        tuple[int, TypeLabel], Decoder
-    ]
-
-
-_TYPE_LABEL_KEY = "__type"
-_AMBER_VERSION_KEY = "__amber_version"
-# TODO: do we want one version for the whole format? Or version every type within a
-#   format separately? Per-type versioning will be much more verbose in the file format,
-#   however means that coders for a given type can be shared between different formats.
-#   e.g. the user might want to compose together different types.
-_FORMAT_VERSION_KEY = "__format_version"
-_PAYLOAD_KEY = "__payload"
-
-AMBER_VERSION = 1
-"""This tracks the techniques used to serialise objects with amber.
-
-The version will be incremeneted whenever breaking changes are made to amber.
-"""
+# TODO: this, or exceptions?
 
 
 # XXX: more details in here
 class EncodeError:
     pass
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnsupportedVersion:
+    """The version requested for deserialisation is not supported."""
+
+    type_label: TypeLabel
+    version_provided: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class InvalidData:
+    type_label: TypeLabel
+    data: JsonType
+    msg: str | None = None
+
+
+type DecodeError = UnsupportedVersion | InvalidData
+
+
+class Coder[T](abc.ABC):
+    """Encapsulate encoding & decoding for a specific type."""
+
+    @property
+    @abc.abstractmethod
+    def type_label(self) -> TypeLabel:
+        """A label for the type this encoder handles.
+
+        This should be an identifier that is unique within the format.
+        """
+
+    @property
+    @abc.abstractmethod
+    def version(self) -> int:
+        """The current version of this coder.
+
+        This is an integer, and it should be incremented whenever a breaking change is
+        made.
+        """
+
+    @abc.abstractmethod
+    def encode(self, value: T) -> EncodeError | JsonType:
+        """Encode `value` using this coder's current version.
+
+        Will return an `EncodeError` if encoding isn't possible.
+        """
+
+    @abc.abstractmethod
+    def decode(self, data: JsonType, version: int) -> DecodeError | T:
+        """Decode `data`, assuming it was encoded with `version` of this coder.
+
+        Will return a `DecodeError` if decoding isn't possible.
+        """
+
+
+# TODO: frozen
+@dataclasses.dataclass
+class SerialisationFormat:
+    version: int
+    """The current version of the serialisation format."""
+
+    coders: tuple[Coder[typing.Any]]
+    """All `Coder` instances registered with this format."""
+
+
+_AMBER_VERSION_KEY = "__amber_version"
+_PAYLOAD_KEY = "__payload"
+_TYPE_LABEL_KEY = "__type"
+# TODO: do we want one version for the whole format? Or version every type within a
+#   format separately? Per-type versioning will be much more verbose in the file format,
+#   however means that coders for a given type can be shared between different formats.
+#   e.g. the user might want to compose together different types.
+_VERSION_KEY = "__version"
+
+AMBER_VERSION = 1
+"""This tracks the techniques used to serialise objects with amber.
+
+The version will be incremented whenever breaking changes are made to amber.
+"""
 
 
 def encode(
@@ -62,7 +104,6 @@ def encode(
 
     return {
         _AMBER_VERSION_KEY: AMBER_VERSION,
-        _FORMAT_VERSION_KEY: format.version,
         _PAYLOAD_KEY: payload,
     }
 
@@ -71,7 +112,7 @@ def _assert_valid_key(x: object) -> None:
     if not isinstance(x, str):
         msg = f"keys must be strings; got {x!r}"
         raise TypeError(msg)
-    if x in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _FORMAT_VERSION_KEY, _PAYLOAD_KEY):
+    if x in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _VERSION_KEY, _PAYLOAD_KEY):
         msg = f"{x!r} is a reserved keyword that can't appear as a dictionary key."
         raise ValueError(msg)
 
@@ -109,3 +150,45 @@ def decode(obj: dict[str, JsonType]) -> object:
 
 def _decode(obj: JsonType, *, amber_version: int, format_version: int):
     raise NotImplementedError
+
+
+# FIXME:
+# FIXME:
+# FIXME:
+# Following are some thoughts on how coders might look given the API above.
+
+
+@dataclasses.dataclass(frozen=True)
+class Moo:
+    x: int
+    y: str
+    z: list[float]
+    w: complex
+
+
+# TODO: not the most compact approach; might want to use a two-element list instead.
+@typing.final
+class ComplexCoder(Coder[complex]):
+    """A coder for Python's `complex` type."""
+
+    @property
+    def type_label(self) -> TypeLabel:
+        return TypeLabel("complex")
+
+    @property
+    def version(self) -> int:
+        return 1
+
+    def encode(self, value: complex) -> EncodeError | JsonType:
+        return {"real": value.real, "imag": value.imag}
+
+    def decode(self, data: JsonType, version: int) -> DecodeError | complex:
+        if version != 1:
+            return UnsupportedVersion(self.type_label, version)
+        if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
+            return InvalidData(self.type_label, data, "Invalid keys")
+        if not isinstance(data["real"], float):
+            return InvalidData(self.type_label, data, "Invalid 'real'")
+        if not isinstance(data["imag"], float):
+            return InvalidData(self.type_label, data, "Invalid 'imag'")
+        return complex(data["real"], data["imag"])
