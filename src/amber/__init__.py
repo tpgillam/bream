@@ -1,7 +1,7 @@
 from typing import NewType, Protocol
 
 _JsonElement = bool | float | int | str | None
-type JsonType = _JsonElement | list["JsonType"] | dict[str, "JsonType"]
+type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
 
 class Coder(Protocol):
