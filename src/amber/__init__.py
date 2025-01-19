@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import abc
 import dataclasses
-from typing import NewType
 import typing
+from typing import NewType
 
 _JsonElement = bool | float | int | str | None
 type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
@@ -102,10 +104,7 @@ def encode(
     if isinstance(payload, EncodeError):
         return payload
 
-    return {
-        _AMBER_VERSION_KEY: AMBER_VERSION,
-        _PAYLOAD_KEY: payload,
-    }
+    return {_AMBER_VERSION_KEY: AMBER_VERSION, _PAYLOAD_KEY: payload}
 
 
 def _assert_valid_key(x: object) -> None:
