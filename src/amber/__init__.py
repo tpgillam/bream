@@ -101,3 +101,11 @@ def _encode(obj: object, format: SerialisationFormat) -> EncodeError | JsonType:
                 return v_encoded
             result[k] = v_encoded
         return result
+
+
+def decode(obj: dict[str, JsonType]) -> object:
+    pass
+
+
+def _decode(obj: JsonType, *, amber_version: int, format_version: int):
+    raise NotImplementedError
