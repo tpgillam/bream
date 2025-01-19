@@ -46,3 +46,12 @@ The three top-level fields are special:
 
 A `Coder` is an object which knows how to convert from the payload back to a Python
 object.
+
+
+## Why not just use pickle?
+The main advantage of explicitly encoding & decoding your objects with amber is the
+ability to _version_ the encoded form, and then provide a "compatibility decode" pathway
+to decode an older encoded representation into the latest in-memory representation.
+
+This also means that upgrading an 'old' file on disk is as simple as decoding then
+encoding again.
