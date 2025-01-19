@@ -16,9 +16,9 @@ payload. For example:
 
 Any JSON tree is a valid amber payload.
 
-### Coders
-Certain JSON trees within a payload can be 'decoded' into Python objects. Any such tree
-is a `dict` with particular metadata. Here's how `complex(0.123, 0.456)` might be
+## Encoded objects
+Certain JSON trees within a payload represent 'encoded' Python objects. Any such tree
+is a `dict` with a particular structure. Here's how `complex(0.123, 0.456)` might be
 encoded:
 ```json
 {
@@ -30,4 +30,10 @@ encoded:
     }
 }
 ```
+The three top-level fields are special:
+- `__type_label` is a unique label for the type.
+- `__version` is incremented whenever the structure of `__payload` needs to change.
+- `__payload` is some JSON data (that may or may not be a dict).
 
+A `Coder` is an object which knows how to convert from the payload back to a Python
+object.
