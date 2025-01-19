@@ -34,6 +34,10 @@ class SerialisationFormat:
 
 _TYPE_LABEL_KEY = "__type"
 _AMBER_VERSION_KEY = "__amber_version"
+# TODO: do we want one version for the whole format? Or version every type within a
+#   format separately? Per-type versioning will be much more verbose in the file format,
+#   however means that coders for a given type can be shared between different formats.
+#   e.g. the user might want to compose together different types.
 _FORMAT_VERSION_KEY = "__format_version"
 _PAYLOAD_KEY = "__payload"
 
