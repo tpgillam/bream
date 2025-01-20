@@ -11,6 +11,19 @@ type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 TypeLabel = NewType("TypeLabel", str)
 """Represent a label for a type."""
 
+
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class TypeSpec:
+    """Represent a type that can be imported from a module."""
+
+    module: str
+    name: str
+
+    @staticmethod
+    def from_type(type_: type) -> TypeSpec:
+        return TypeSpec(module=type_.__module__, name=type_.__name__)
+
+
 # TODO: these error types, or exceptions?
 
 
@@ -53,7 +66,22 @@ class Coder[T](abc.ABC):
     def type_label(self) -> TypeLabel:
         """A label for the type this encoder handles.
 
-        This should be an identifier that is unique within the format.
+        This should be an identifier that is unique within the format. It can NEVER be
+        changed once specified if wanting to maintain backwards compatibility.
+        """
+
+    # FIXME: I suspect neither the type_spec nor type_label should not actually live
+    #   on the coder. That's because two things are both decoupled from `version`.
+    #   If we move a type then we should change where we build the format, but hopefully
+    #   the coder itself doesn't have to be changed.
+    @property
+    @abc.abstractmethod
+    def type_spec(self) -> TypeSpec:
+        """The `TypeSpec` for the type that this coder can handle.
+
+        Note that changing the `TypeSpec` need not trigger a bump in the `version`. For
+        example, an `ImportableType` might be renamed, or moved to another module. This
+        means that the type spec changes.
         """
 
     @property
@@ -96,15 +124,20 @@ class SerialisationFormat:
     version: int
     """The current version of the serialisation format."""
 
-    # FIXME: freeze
-    type_spec_to_coder: dict[TypeSpec, Coder[typing.Any]]
+    # FIXME: ensure we don't have multiple coders for a given type.
+    coders: tuple[Coder[typing.Any]]
     """All `Coder` instances registered with this format."""
 
     def find_coder[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
+        spec = TypeSpec.from_type(type(obj))
         # PERF: we don't want this to be an O(N) lookup! Build some maps on construction
         #   to ensure that we don't do anything silly.
+        for coder in self.coders:
+            if coder.type_spec == spec:
+                return coder
 
+        return None
 
 
 _AMBER_VERSION_KEY = "__amber_version"
@@ -151,6 +184,7 @@ def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
     return coder.encode(obj)
 
 
+# TODO: should these be Coders for builtins?
 def _encode_list(
     obj: list[typing.Any], fmt: SerialisationFormat
 ) -> EncodeError | list[JsonType]:

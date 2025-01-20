@@ -25,6 +25,10 @@ class ComplexCoder(amber.Coder[complex]):
         return amber.TypeLabel("complex")
 
     @property
+    def type_spec(self) -> amber.TypeSpec:
+        return amber.BuiltinType(name="complex")
+
+    @property
     def version(self) -> int:
         return 1
 
