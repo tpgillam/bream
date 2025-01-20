@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import enum
 import typing
 from typing import NewType
 
@@ -140,10 +141,14 @@ class SerialisationFormat:
         return None
 
 
-_AMBER_VERSION_KEY = "__amber_version"
-_PAYLOAD_KEY = "__payload"
-_TYPE_LABEL_KEY = "__type"
-_VERSION_KEY = "__version"
+class Keys(enum.Enum):
+    """Special reserved keys for use in amber."""
+
+    amber_version = "__amber_version"
+    payload = "__payload"
+    type_label = "__type"
+    version = "__version"
+
 
 AMBER_VERSION = 1
 """This tracks the techniques used to serialise objects with amber.
@@ -157,13 +162,13 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | dict[str, Jso
     if isinstance(payload, EncodeError):
         return payload
 
-    return {_AMBER_VERSION_KEY: AMBER_VERSION, _PAYLOAD_KEY: payload}
+    return {Keys.amber_version.value: AMBER_VERSION, Keys.payload.value: payload}
 
 
 def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
     if not isinstance(x, str):
         return False
-    return x not in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _VERSION_KEY, _PAYLOAD_KEY)
+    return x not in Keys
 
 
 def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
@@ -181,7 +186,14 @@ def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
     if coder is None:
         return NoEncoderAvailable(obj)
 
-    return coder.encode(obj)
+    payload = coder.encode(obj)
+    if isinstance(payload, EncodeError):
+        return payload
+    return {
+        Keys.type_label.value: coder.type_label,
+        Keys.version.value: coder.version,
+        Keys.payload.value: payload,
+    }
 
 
 # TODO: should these be Coders for builtins?
