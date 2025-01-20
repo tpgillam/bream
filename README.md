@@ -1,5 +1,5 @@
 # amber
-`amber` is an explictly versioned encode/decode library for JSON-like trees.
+`amber` is an explictly versioned encode/decode framework targetting JSON-like trees.
 
 ## Goals and non-goals
 `amber` aims to be the following:
