@@ -10,12 +10,20 @@ type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
 TypeLabel = NewType("TypeLabel", str)
 
-# TODO: this, or exceptions?
+# TODO: these error types, or exceptions?
 
 
-# XXX: more details in here
-class EncodeError:
-    pass
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnencodableObject:
+    value: object
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnencodableDictKey:
+    value: object
+
+
+EncodeError = UnencodableObject | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -84,10 +92,6 @@ class SerialisationFormat:
 _AMBER_VERSION_KEY = "__amber_version"
 _PAYLOAD_KEY = "__payload"
 _TYPE_LABEL_KEY = "__type"
-# TODO: do we want one version for the whole format? Or version every type within a
-#   format separately? Per-type versioning will be much more verbose in the file format,
-#   however means that coders for a given type can be shared between different formats.
-#   e.g. the user might want to compose together different types.
 _VERSION_KEY = "__version"
 
 AMBER_VERSION = 1
@@ -97,50 +101,64 @@ The version will be incremented whenever breaking changes are made to amber.
 """
 
 
-def encode(
-    obj: object, format: SerialisationFormat
-) -> EncodeError | dict[str, JsonType]:
-    payload = _encode(obj, format)
+def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | dict[str, JsonType]:
+    payload = _encode(obj, fmt)
     if isinstance(payload, EncodeError):
         return payload
 
     return {_AMBER_VERSION_KEY: AMBER_VERSION, _PAYLOAD_KEY: payload}
 
 
-def _assert_valid_key(x: object) -> None:
+def _is_valid_key(x: object) -> typing.TypeGuard[str]:
     if not isinstance(x, str):
+        return False
         msg = f"keys must be strings; got {x!r}"
         raise TypeError(msg)
     if x in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _VERSION_KEY, _PAYLOAD_KEY):
+        return False
         msg = f"{x!r} is a reserved keyword that can't appear as a dictionary key."
         raise ValueError(msg)
+    return True
 
 
-def _encode(obj: object, format: SerialisationFormat) -> EncodeError | JsonType:
+def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
     if isinstance(obj, _JsonElement):
         return obj
 
-    # TODO: should this be hardcoded, or added as something registerable?
     if isinstance(obj, list):
-        result = []
-        for x in obj:
-            x_encoded = _encode(x, format)
-            if isinstance(x_encoded, EncodeError):
-                return x_encoded
-            result.append(x_encoded)
-        return result
+        return _encode_list(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
-    # TODO: should this be hardcoded, or added as something registerable?
     if isinstance(obj, dict):
-        result = {}
-        for k, v in obj.items():
-            # TODO: Support non-string keys
-            _assert_valid_key(k)
-            v_encoded = _encode(v, format)
-            if isinstance(v_encoded, EncodeError):
-                return v_encoded
-            result[k] = v_encoded
-        return result
+        return _encode_dict(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
+
+    return UnencodableObject(obj)
+
+
+def _encode_list(
+    obj: list[typing.Any], fmt: SerialisationFormat
+) -> EncodeError | list[JsonType]:
+    result: list[JsonType] = []
+    for x in obj:
+        x_encoded = _encode(x, fmt)
+        if isinstance(x_encoded, EncodeError):
+            return x_encoded
+        result.append(x_encoded)
+    return result
+
+
+def _encode_dict(
+    obj: dict[typing.Any, typing.Any], fmt: SerialisationFormat
+) -> EncodeError | dict[str, JsonType]:
+    result: dict[str, JsonType] = {}
+    for k, v in obj.items():
+        # TODO: Support non-string keys
+        if not _is_valid_key(k):
+            return UnencodableDictKey(k)
+        v_encoded = _encode(v, fmt)
+        if isinstance(v_encoded, EncodeError):
+            return v_encoded
+        result[k] = v_encoded
+    return result
 
 
 def decode(obj: dict[str, JsonType]) -> object:
@@ -149,5 +167,3 @@ def decode(obj: dict[str, JsonType]) -> object:
 
 def _decode(obj: JsonType, *, amber_version: int, format_version: int):
     raise NotImplementedError
-
-
