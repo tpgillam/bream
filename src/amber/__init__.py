@@ -9,12 +9,13 @@ _JsonElement = bool | float | int | str | None
 type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
 TypeLabel = NewType("TypeLabel", str)
+"""Represent a label for a type."""
 
 # TODO: these error types, or exceptions?
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnencodableObject:
+class NoEncoderAvailable:
     value: object
 
 
@@ -23,7 +24,7 @@ class UnencodableDictKey:
     value: object
 
 
-EncodeError = UnencodableObject | UnencodableDictKey
+EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -61,7 +62,16 @@ class Coder[T](abc.ABC):
         """The current version of this coder.
 
         This is an integer, and it should be incremented whenever a breaking change is
-        made.
+        made. For example:
+
+            - The type `T` might be altered to change its representation. The
+              corresponding `Coder` version should be bumped, and (if possible) a
+              fallback pathway provided in `encode` to decode older version to the
+              current runtime representation.
+
+            - `T` may be unaltered, but an optimisation is made to the encoded
+              representation. The version should also be increased, and a compatibility
+              pathway be provided.
         """
 
     @abc.abstractmethod
@@ -80,13 +90,21 @@ class Coder[T](abc.ABC):
 
 
 # TODO: frozen
+@typing.final
 @dataclasses.dataclass
 class SerialisationFormat:
     version: int
     """The current version of the serialisation format."""
 
-    coders: tuple[Coder[typing.Any]]
+    # FIXME: freeze
+    type_spec_to_coder: dict[TypeSpec, Coder[typing.Any]]
     """All `Coder` instances registered with this format."""
+
+    def find_coder[T](self, obj: T) -> Coder[T] | None:
+        """Find a suitable coder for `obj`, or `None` if there isn't one."""
+        # PERF: we don't want this to be an O(N) lookup! Build some maps on construction
+        #   to ensure that we don't do anything silly.
+
 
 
 _AMBER_VERSION_KEY = "__amber_version"
@@ -109,16 +127,10 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | dict[str, Jso
     return {_AMBER_VERSION_KEY: AMBER_VERSION, _PAYLOAD_KEY: payload}
 
 
-def _is_valid_key(x: object) -> typing.TypeGuard[str]:
+def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
     if not isinstance(x, str):
         return False
-        msg = f"keys must be strings; got {x!r}"
-        raise TypeError(msg)
-    if x in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _VERSION_KEY, _PAYLOAD_KEY):
-        return False
-        msg = f"{x!r} is a reserved keyword that can't appear as a dictionary key."
-        raise ValueError(msg)
-    return True
+    return x not in (_TYPE_LABEL_KEY, _AMBER_VERSION_KEY, _VERSION_KEY, _PAYLOAD_KEY)
 
 
 def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
@@ -131,7 +143,12 @@ def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
     if isinstance(obj, dict):
         return _encode_dict(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
-    return UnencodableObject(obj)
+    # We have handled all native types; now we delegate to the custom coders.
+    coder = fmt.find_coder(obj)
+    if coder is None:
+        return NoEncoderAvailable(obj)
+
+    return coder.encode(obj)
 
 
 def _encode_list(
@@ -151,8 +168,9 @@ def _encode_dict(
 ) -> EncodeError | dict[str, JsonType]:
     result: dict[str, JsonType] = {}
     for k, v in obj.items():
-        # TODO: Support non-string keys
-        if not _is_valid_key(k):
+        # TODO: Support non-string keys -- this will require a different representation
+        #   for a dict.
+        if not _is_valid_dict_key(k):
             return UnencodableDictKey(k)
         v_encoded = _encode(v, fmt)
         if isinstance(v_encoded, EncodeError):
