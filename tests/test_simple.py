@@ -43,10 +43,21 @@ def test_unsupported_encode() -> None:
     assert amber.encode({3}, fmt) == amber.NoEncoderAvailable(value={3})
 
 
-def test_encode_document() -> None:
+# FIXME: test decode basic types
+# FIXME: test decode basic types
+# FIXME: test decode basic types
+
+def test_document() -> None:
     fmt = amber.SerialisationFormat(coders=())
     for x in (None, 2, 4.2, "moo", [1, None, 3], {"a": [3, 4], "b": {"c": 4.2}}):
-        assert amber.encode_document(x, fmt) == {
-            amber.Keys.amber_version.value: amber.AMBER_VERSION,
-            amber.Keys.payload.value: x,
-        }
+        document = amber.encode_to_document(x, fmt)
+        assert not isinstance(document, amber.EncodeError)
+        assert document == {"_amber_version": amber.AMBER_VERSION, "_payload": x}
+        new_x = amber.decode_document(document, fmt)
+        assert new_x == x
+        if isinstance(x, list | dict):
+            # Mutable python structures should not be identically equal, lest mutation
+            # occurs.
+            assert document["_payload"] is not x
+            assert new_x is not document["_payload"]
+            assert new_x is not x
