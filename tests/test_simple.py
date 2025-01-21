@@ -1,52 +1,49 @@
 from __future__ import annotations
 
-import dataclasses
-import typing
-
 import amber
 
 
-@dataclasses.dataclass(frozen=True)
-class Moo:
-    x: int
-    y: str
-    z: list[float]
-    w: complex
+def test_scalar_encode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    assert amber.encode(None, fmt) is None
+    assert amber.encode(2, fmt) == 2
+    assert amber.encode(4.2, fmt) == 4.2
+    assert amber.encode("moo", fmt) == "moo"
+
+    for x in (None, 2, 4.2, "moo"):
+        assert amber.encode_document(x, fmt) == {
+            amber.Keys.amber_version.value: amber.AMBER_VERSION,
+            amber.Keys.payload.value: x,
+        }
 
 
-# TODO: not the most compact approach; might want to use a two-element list instead.
-@typing.final
-class ComplexCoder(amber.Coder[complex]):
-    """A coder for Python's `complex` type."""
+def test_list_encode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    x = [None, 2, 4.2, "moo"]
+    x_encoded = amber.encode(x, fmt)
+    assert x_encoded == x
+    assert x_encoded is not x
 
-    @property
-    def type_label(self) -> amber.TypeLabel:
-        return amber.TypeLabel("complex")
 
-    @property
-    def type_spec(self) -> amber.TypeSpec:
-        return amber.TypeSpec(module="builtins", name="complex")
+def test_dict_encode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    x = {"a": None, "b": 2, "c": 4.2, "d": "moo"}
+    x_encoded = amber.encode(x, fmt)
+    assert x_encoded == x
+    assert x_encoded is not x
 
-    @property
-    def version(self) -> int:
-        return 1
 
-    def encode(
-        self, value: complex, fmt: amber.SerialisationFormat
-    ) -> amber.EncodeError | amber.JsonType:
-        del fmt
-        return {"real": value.real, "imag": value.imag}
+def test_nested_structure_encode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    x = [None, 2, 4.2, "moo"]
+    y = {"a": None, "b": 2, "c": 4.2, "d": "moo", "e": x}
+    y_encoded = amber.encode(y, fmt)
+    assert y_encoded == y
+    assert y_encoded is not y
 
-    def decode(
-        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
-    ) -> amber.DecodeError | complex:
-        del fmt
-        if version != 1:
-            return amber.UnsupportedVersion(self.type_label, version)
-        if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return amber.InvalidData(self.type_label, data, "Invalid keys")
-        if not isinstance(data["real"], float):
-            return amber.InvalidData(self.type_label, data, "Invalid 'real'")
-        if not isinstance(data["imag"], float):
-            return amber.InvalidData(self.type_label, data, "Invalid 'imag'")
-        return complex(data["real"], data["imag"])
+
+def test_unsupported_encode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    assert amber.encode(1j, fmt) == amber.NoEncoderAvailable(value=1j)
+    assert amber.encode((42,), fmt) == amber.NoEncoderAvailable(value=(42,))
+    assert amber.encode({3}, fmt) == amber.NoEncoderAvailable(value={3})
