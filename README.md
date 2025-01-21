@@ -19,7 +19,9 @@ payload. For example:
 ```json
 {
     "__amber_version": 1,
-    "__payload": {<<...serialised data here...>>}
+    "__payload": {
+        "serialised": ["data", "goes", "here"]
+    }
 }
 ```
 
