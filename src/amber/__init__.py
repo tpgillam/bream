@@ -9,7 +9,9 @@ from typing import NewType
 if typing.TYPE_CHECKING:
     from collections.abc import Sequence
 
-AMBER_VERSION = 1
+# FIXME: warning -- version 0 is for pre-alpha development and WILL be broken on a
+#   regular basis
+AMBER_VERSION = 0
 """This tracks the techniques used to serialise objects with amber.
 
 The version will be incremented whenever breaking changes are made to amber.
@@ -78,7 +80,14 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedVersion:
+class UnsupportedAmberVersion:
+    """The version of amber specifie for deserialisation is unsupported."""
+
+    amber_version: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnsupportedCoderVersion:
     """The version requested for deserialisation is not supported."""
 
     type_label: TypeLabel
@@ -86,13 +95,19 @@ class UnsupportedVersion:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class InvalidData:
+class InvalidPayloadData:
     type_label: TypeLabel
     data: JsonType
-    msg: str | None = None
 
 
-type DecodeError = UnsupportedVersion | InvalidData
+@dataclasses.dataclass(frozen=True, slots=True)
+class InvalidJson:
+    data: object
+
+
+type DecodeError = (
+    UnsupportedAmberVersion | UnsupportedCoderVersion | InvalidPayloadData | InvalidJson
+)
 
 
 class Coder[T](abc.ABC):
@@ -170,7 +185,7 @@ class SerialisationFormat:
     # """The current version of the serialisation format."""
 
     def __init__(self, *, coders: Sequence[Coder[typing.Any]]) -> None:
-        # FIXME: ensure we don't have multiple coders for a given type.
+        # FIXME: ensure we don't have multiple coders for a given type. Test it.
         self._coders = tuple(coders)
 
     @property
@@ -190,7 +205,7 @@ class SerialisationFormat:
         return None
 
 
-def encode_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
+def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
     """Encode `obj`, and place inside an amber document."""
     payload = encode(obj, fmt)
     if isinstance(payload, EncodeError):
@@ -265,10 +280,42 @@ def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | Coder
     }
 
 
-def decode_document(obj: Document, fmt: SerialisationFormat) -> object:
+def decode_document(
+    document: Document, fmt: SerialisationFormat
+) -> DecodeError | object:
     """Decode an amber document."""
     raise NotImplementedError
 
 
-def decode(obj: JsonType, fmt: SerialisationFormat, amber_version: int) -> object:
+def decode(
+    obj: JsonType, fmt: SerialisationFormat, amber_version: int
+) -> DecodeError | object:
+    # FIXME: version 0 should get a special error once we go stable.
+    if amber_version != 0:
+        return UnsupportedAmberVersion(amber_version=amber_version)
+
+    if isinstance(obj, _JsonElement):
+        return obj
+
+    if isinstance(obj, list):
+        return _decode_list(obj, fmt)
+
+    if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
+        # FIXME: custom decoding goes here.
+        return _decode_dict(obj, fmt)
+
+    # NOTE: strictly unreachable, but we're catching the case where the function has
+    # been called in a manner that doesn't obey the static types.
+    return InvalidJson(obj)
+
+
+def _decode_list(
+    obj: list[JsonType], fmt: SerialisationFormat
+) -> DecodeError | list[object]:
+    raise NotImplementedError
+
+
+def _decode_dict(
+    obj: dict[str, JsonType], fmt: SerialisationFormat
+) -> DecodeError | list[object]:
     raise NotImplementedError
