@@ -17,8 +17,7 @@ Please do test-drive and give feedback, or else check back soon for a stable ver
 - Explicit: no silent conversion. User-provided versions, easy upgrades.
 - Modular: bring-your-own codecs.
 
-It _does not_ aim to be:
-- Scalable: `amber` is (probably) very slow. Speed isn't a current design goal.
+It _does not_ aim to be fast. Speed isn't a current design goal.
 
 ## Data structure
 A JSON tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
