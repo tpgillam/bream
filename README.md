@@ -3,7 +3,9 @@ amber is currently in pre-alpha development, and does _NOT_ yet have a
     stable serialisation format.
 
 Please do test-drive and give feedback, or else check back soon for a stable version!
+
 **END WARNING**   
+
 ---
 
 # amber
