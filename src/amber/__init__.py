@@ -186,14 +186,14 @@ class SerialisationFormat:
     # """The current version of the serialisation format."""
 
     def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
-        type_spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
+        spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
         for coder in coders:
-            previous = type_spec_to_coder.setdefault(coder.type_spec, coder)
+            previous = spec_to_coder.setdefault(coder.type_spec, coder)
             if previous is not coder:
                 msg = f"multiple coders for {coder.type_spec}"
                 raise ValueError(msg)
-        self._type_spec_to_coder = type_spec_to_coder
-        self._coders = tuple(type_spec_to_coder.values())
+        self._spec_to_coder = spec_to_coder
+        self._coders = tuple(spec_to_coder.values())
 
     @property
     def coders(self) -> tuple[Coder[typing.Any], ...]:
@@ -203,7 +203,7 @@ class SerialisationFormat:
     def find_coder[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
         spec = TypeSpec.from_type(type(obj))
-        return self._type_spec_to_coder.get(spec)
+        return self._spec_to_coder.get(spec)
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
