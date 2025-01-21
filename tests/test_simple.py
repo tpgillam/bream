@@ -10,12 +10,6 @@ def test_scalar_encode() -> None:
     assert amber.encode(4.2, fmt) == 4.2
     assert amber.encode("moo", fmt) == "moo"
 
-    for x in (None, 2, 4.2, "moo"):
-        assert amber.encode_document(x, fmt) == {
-            amber.Keys.amber_version.value: amber.AMBER_VERSION,
-            amber.Keys.payload.value: x,
-        }
-
 
 def test_list_encode() -> None:
     fmt = amber.SerialisationFormat(coders=())
@@ -47,3 +41,12 @@ def test_unsupported_encode() -> None:
     assert amber.encode(1j, fmt) == amber.NoEncoderAvailable(value=1j)
     assert amber.encode((42,), fmt) == amber.NoEncoderAvailable(value=(42,))
     assert amber.encode({3}, fmt) == amber.NoEncoderAvailable(value={3})
+
+
+def test_encode_document() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    for x in (None, 2, 4.2, "moo", [1, None, 3], {"a": [3, 4], "b": {"c": 4.2}}):
+        assert amber.encode_document(x, fmt) == {
+            amber.Keys.amber_version.value: amber.AMBER_VERSION,
+            amber.Keys.payload.value: x,
+        }
