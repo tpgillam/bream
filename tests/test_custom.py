@@ -44,6 +44,37 @@ class ComplexCoder(amber.Coder[complex]):
         return complex(data["real"], data["imag"])
 
 
+class Moo:
+    pass
+
+
+@typing.final
+class MooCoder(amber.Coder[Moo]):
+    @property
+    def type_label(self) -> amber.TypeLabel:
+        return amber.TypeLabel("Moo")
+
+    @property
+    def type_spec(self) -> amber.TypeSpec:
+        return amber.TypeSpec.from_type(Moo)
+
+    @property
+    def version(self) -> int:
+        return 1
+
+    def encode(
+        self, value: Moo, fmt: amber.SerialisationFormat
+    ) -> amber.EncodeError | amber.JsonType:
+        del value, fmt
+        return {}
+
+    def decode(
+        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+    ) -> amber.DecodeError | Moo:
+        del data, fmt, version
+        return Moo()
+
+
 def test_custom_complex() -> None:
     fmt = amber.SerialisationFormat(coders=[ComplexCoder()])
     x = 1 + 2j
@@ -57,36 +88,6 @@ def test_custom_complex() -> None:
     }
     new_x = amber.decode(encoded_x, fmt, amber_version=0)
     assert new_x == x
-
-
-class Moo:
-    pass
-
-
-class MooCoder(amber.Coder[Moo]):
-    @property
-    def type_label(self) -> amber.TypeLabel:
-        return amber.TypeLabel("Moo")
-
-    @property
-    def type_spec(self) -> amber.TypeSpec:
-        return amber.TypeSpec(module="moo", name="Moo")
-
-    @property
-    def version(self) -> int:
-        return 0
-
-    def encode(
-        self, value: Moo, fmt: amber.SerialisationFormat
-    ) -> amber.EncodeError | amber.JsonType:
-        del value, fmt
-        return {}
-
-    def decode(
-        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
-    ) -> amber.DecodeError | Moo:
-        del data, fmt, version
-        return Moo()
 
 
 def test_serialization_format_find_coder() -> None:
