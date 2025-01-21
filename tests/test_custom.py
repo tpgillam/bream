@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import typing
 
+import pytest
+
 import amber
 
 
@@ -55,3 +57,46 @@ def test_custom_complex() -> None:
     }
     new_x = amber.decode(encoded_x, fmt, amber_version=0)
     assert new_x == x
+
+
+class Moo:
+    pass
+
+
+class MooCoder(amber.Coder[Moo]):
+    @property
+    def type_label(self) -> amber.TypeLabel:
+        return amber.TypeLabel("Moo")
+
+    @property
+    def type_spec(self) -> amber.TypeSpec:
+        return amber.TypeSpec(module="moo", name="Moo")
+
+    @property
+    def version(self) -> int:
+        return 0
+
+    def encode(
+        self, value: Moo, fmt: amber.SerialisationFormat
+    ) -> amber.EncodeError | amber.JsonType:
+        del value, fmt
+        return {}
+
+    def decode(
+        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+    ) -> amber.DecodeError | Moo:
+        del data, fmt, version
+        return Moo()
+
+
+def test_serialization_format_find_coder() -> None:
+    coder_complex = ComplexCoder()
+    coder_moo = MooCoder()
+    fmt = amber.SerialisationFormat(coders=[coder_complex, coder_moo])
+    assert fmt.find_coder(0j) is coder_complex
+    assert fmt.find_coder(Moo()) is coder_moo
+
+
+def test_serialization_format_raises_on_clashes() -> None:
+    with pytest.raises(ValueError, match="multiple coders"):
+        amber.SerialisationFormat(coders=[ComplexCoder(), ComplexCoder()])
