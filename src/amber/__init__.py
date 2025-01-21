@@ -81,7 +81,7 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class UnsupportedAmberVersion:
-    """The version of amber specifie for deserialisation is unsupported."""
+    """The version of amber specified for deserialisation is unsupported."""
 
     amber_version: int
 
@@ -309,6 +309,7 @@ def decode(
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
+    typing.assert_never(obj)
     return InvalidJson(obj)
 
 
