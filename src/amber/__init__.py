@@ -6,8 +6,46 @@ import enum
 import typing
 from typing import NewType
 
+AMBER_VERSION = 1
+"""This tracks the techniques used to serialise objects with amber.
+
+The version will be incremented whenever breaking changes are made to amber.
+"""
+
+
+class Keys(enum.Enum):
+    """Special reserved keys for use in amber."""
+
+    amber_version = "_amber_version"
+    payload = "_payload"
+    type_label = "_type"
+    version = "_version"
+
+
+# FIXME: should the document also contain some kind of identifier for the format? This
+#    would mirror some property added to `SerialisationFormat`.
+class Document(typing.TypedDict):
+    """The structure of an amber document."""
+
+    _amber_version: int
+    _payload: JsonType
+
+
+class CoderEncoded(typing.TypedDict):
+    """The structure of a subtree encoded with a Coder."""
+
+    _type: TypeLabel
+    _version: int
+    _payload: JsonType
+
+
 _JsonElement = bool | float | int | str | None
-type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
+# NOTE: static type checking does not see `Document` and `CoderEncoded` as subtypes of
+#   `JsonType`, even though at runtime they do adhere to the definition. To aid the type
+#   checker we therefore add them to this union explicitly.
+type JsonType = (
+    _JsonElement | list[JsonType] | dict[str, JsonType] | Document | CoderEncoded
+)
 
 TypeLabel = NewType("TypeLabel", str)
 """Represent a label for a type."""
@@ -103,16 +141,25 @@ class Coder[T](abc.ABC):
               pathway be provided.
         """
 
+    # FIXME: open issue about avoiding cycles.
     @abc.abstractmethod
-    def encode(self, value: T) -> EncodeError | JsonType:
+    def encode(self, value: T, fmt: SerialisationFormat) -> EncodeError | JsonType:
         """Encode `value` using this coder's current version.
+
+        Note that this must encode recursively. Implementers should use `fmt` with
+        `amber.encode` to encode any child entities.
 
         Will return an `EncodeError` if encoding isn't possible.
         """
 
     @abc.abstractmethod
-    def decode(self, data: JsonType, version: int) -> DecodeError | T:
+    def decode(
+        self, data: JsonType, fmt: SerialisationFormat, version: int
+    ) -> DecodeError | T:
         """Decode `data`, assuming it was encoded with `version` of this coder.
+
+        Note that `data` may contain other encoded types. Implementers should use `fmt`
+        with `amber.decode` to decode any child entities.
 
         Will return a `DecodeError` if decoding isn't possible.
         """
@@ -141,24 +188,9 @@ class SerialisationFormat:
         return None
 
 
-class Keys(enum.Enum):
-    """Special reserved keys for use in amber."""
-
-    amber_version = "__amber_version"
-    payload = "__payload"
-    type_label = "__type"
-    version = "__version"
-
-
-AMBER_VERSION = 1
-"""This tracks the techniques used to serialise objects with amber.
-
-The version will be incremented whenever breaking changes are made to amber.
-"""
-
-
-def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | dict[str, JsonType]:
-    payload = _encode(obj, fmt)
+def encode_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
+    """Encode `obj`, and place inside an amber document."""
+    payload = encode(obj, fmt)
     if isinstance(payload, EncodeError):
         return payload
 
@@ -171,7 +203,7 @@ def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
     return x not in Keys
 
 
-def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
+def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
     if isinstance(obj, _JsonElement):
         return obj
 
@@ -182,18 +214,7 @@ def _encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
         return _encode_dict(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
     # We have handled all native types; now we delegate to the custom coders.
-    coder = fmt.find_coder(obj)
-    if coder is None:
-        return NoEncoderAvailable(obj)
-
-    payload = coder.encode(obj)
-    if isinstance(payload, EncodeError):
-        return payload
-    return {
-        Keys.type_label.value: coder.type_label,
-        Keys.version.value: coder.version,
-        Keys.payload.value: payload,
-    }
+    return _encode_custom(obj, fmt)
 
 
 # TODO: should these be Coders for builtins?
@@ -202,7 +223,7 @@ def _encode_list(
 ) -> EncodeError | list[JsonType]:
     result: list[JsonType] = []
     for x in obj:
-        x_encoded = _encode(x, fmt)
+        x_encoded = encode(x, fmt)
         if isinstance(x_encoded, EncodeError):
             return x_encoded
         result.append(x_encoded)
@@ -218,16 +239,32 @@ def _encode_dict(
         #   for a dict.
         if not _is_valid_dict_key(k):
             return UnencodableDictKey(k)
-        v_encoded = _encode(v, fmt)
+        v_encoded = encode(v, fmt)
         if isinstance(v_encoded, EncodeError):
             return v_encoded
         result[k] = v_encoded
     return result
 
 
-def decode(obj: dict[str, JsonType]) -> object:
-    pass
+def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | CoderEncoded:
+    coder = fmt.find_coder(obj)
+    if coder is None:
+        return NoEncoderAvailable(obj)
+
+    payload = coder.encode(obj, fmt)
+    if isinstance(payload, EncodeError):
+        return payload
+    return {
+        Keys.type_label.value: coder.type_label,
+        Keys.version.value: coder.version,
+        Keys.payload.value: payload,
+    }
 
 
-def _decode(obj: JsonType, *, amber_version: int, format_version: int):
+def decode_document(obj: Document, fmt: SerialisationFormat) -> object:
+    """Decode an amber document."""
+    raise NotImplementedError
+
+
+def decode(obj: JsonType, fmt: SerialisationFormat, amber_version: int) -> object:
     raise NotImplementedError
