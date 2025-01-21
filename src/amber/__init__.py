@@ -284,7 +284,9 @@ def decode_document(
     document: Document, fmt: SerialisationFormat
 ) -> DecodeError | object:
     """Decode an amber document."""
-    raise NotImplementedError
+    return decode(
+        obj=document["_payload"], fmt=fmt, amber_version=document["_amber_version"]
+    )
 
 
 def decode(
@@ -298,11 +300,11 @@ def decode(
         return obj
 
     if isinstance(obj, list):
-        return _decode_list(obj, fmt)
+        return _decode_list(obj, fmt, amber_version)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
         # FIXME: custom decoding goes here.
-        return _decode_dict(obj, fmt)
+        return _decode_dict(obj, fmt, amber_version)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
@@ -310,12 +312,20 @@ def decode(
 
 
 def _decode_list(
-    obj: list[JsonType], fmt: SerialisationFormat
+    obj: list[JsonType], fmt: SerialisationFormat, amber_version: int
 ) -> DecodeError | list[object]:
-    raise NotImplementedError
+    # FIXME: gah we can't use a comprehension since we might get error values.
+    #   NB that we're not getting a linter error since the success path might just be an
+    #   'object'. We should probably use some kind of 'Result' type if avoiding
+    #   exceptions.
+    return [decode(x, fmt, amber_version) for x in obj]
 
 
 def _decode_dict(
-    obj: dict[str, JsonType], fmt: SerialisationFormat
-) -> DecodeError | list[object]:
-    raise NotImplementedError
+    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_version: int
+) -> DecodeError | dict[str, object]:
+    # FIXME: gah we can't use a comprehension since we might get error values.
+    #   NB that we're not getting a linter error since the success path might just be an
+    #   'object'. We should probably use some kind of 'Result' type if avoiding
+    #   exceptions.
+    return {k: decode(v, fmt, amber_version) for k, v in obj.items()}
