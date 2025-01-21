@@ -6,6 +6,9 @@ import enum
 import typing
 from typing import NewType
 
+if typing.TYPE_CHECKING:
+    from collections.abc import Sequence
+
 AMBER_VERSION = 1
 """This tracks the techniques used to serialise objects with amber.
 
@@ -160,16 +163,20 @@ class Coder[T](abc.ABC):
         """
 
 
-# TODO: frozen
 @typing.final
-@dataclasses.dataclass
 class SerialisationFormat:
-    version: int
-    """The current version of the serialisation format."""
+    # FIXME: do we want a version here?
+    # version: int
+    # """The current version of the serialisation format."""
 
-    # FIXME: ensure we don't have multiple coders for a given type.
-    coders: tuple[Coder[typing.Any]]
-    """All `Coder` instances registered with this format."""
+    def __init__(self, *, coders: Sequence[Coder[typing.Any]]) -> None:
+        # FIXME: ensure we don't have multiple coders for a given type.
+        self._coders = tuple(coders)
+
+    @property
+    def coders(self) -> tuple[Coder[typing.Any], ...]:
+        """All `Coder` instances registered with this format."""
+        return self._coders
 
     def find_coder[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
