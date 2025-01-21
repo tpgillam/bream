@@ -1,4 +1,3 @@
-# Following are some thoughts on how coders might look given the API above.
 from __future__ import annotations
 
 import dataclasses
@@ -32,10 +31,16 @@ class ComplexCoder(amber.Coder[complex]):
     def version(self) -> int:
         return 1
 
-    def encode(self, value: complex) -> amber.EncodeError | amber.JsonType:
+    def encode(
+        self, value: complex, fmt: amber.SerialisationFormat
+    ) -> amber.EncodeError | amber.JsonType:
+        del fmt
         return {"real": value.real, "imag": value.imag}
 
-    def decode(self, data: amber.JsonType, version: int) -> amber.DecodeError | complex:
+    def decode(
+        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+    ) -> amber.DecodeError | complex:
+        del fmt
         if version != 1:
             return amber.UnsupportedVersion(self.type_label, version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
