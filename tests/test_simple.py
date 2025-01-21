@@ -57,7 +57,7 @@ def test_scalar_decode() -> None:
 # FIXME: test decode basic types
 
 
-def test_document() -> None:
+def test_simple_document_round_trip() -> None:
     fmt = amber.SerialisationFormat(coders=())
     for x in (None, 2, 4.2, "moo", [1, None, 3], {"a": [3, 4], "b": {"c": 4.2}}):
         document = amber.encode_to_document(x, fmt)

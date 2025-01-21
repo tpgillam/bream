@@ -1,23 +1,13 @@
 from __future__ import annotations
 
-import dataclasses
 import typing
 
 import amber
 
 
-@dataclasses.dataclass(frozen=True)
-class Moo:
-    x: int
-    y: str
-    z: list[float]
-    w: complex
-
-
-# TODO: not the most compact approach; might want to use a two-element list instead.
 @typing.final
 class ComplexCoder(amber.Coder[complex]):
-    """A coder for Python's `complex` type."""
+    """An demonstration coder for Python's `complex` type."""
 
     @property
     def type_label(self) -> amber.TypeLabel:
@@ -42,11 +32,26 @@ class ComplexCoder(amber.Coder[complex]):
     ) -> amber.DecodeError | complex:
         del fmt
         if version != 1:
-            return amber.UnsupportedVersion(self.type_label, version)
+            return amber.UnsupportedCoderVersion(self.type_label, version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return amber.InvalidData(self.type_label, data, "Invalid keys")
+            return amber.InvalidPayloadData(self.type_label, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return amber.InvalidData(self.type_label, data, "Invalid 'real'")
+            return amber.InvalidPayloadData(self.type_label, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return amber.InvalidData(self.type_label, data, "Invalid 'imag'")
+            return amber.InvalidPayloadData(self.type_label, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
+
+
+def test_custom_complex() -> None:
+    fmt = amber.SerialisationFormat(coders=[ComplexCoder()])
+    x = 1 + 2j
+    assert isinstance(x, complex)
+    encoded_x = amber.encode(x, fmt)
+    assert not isinstance(encoded_x, amber.EncodeError)
+    assert encoded_x == {
+        "_type": "complex",
+        "_version": 1,
+        "_payload": {"real": 1.0, "imag": 2.0},
+    }
+    new_x = amber.decode(encoded_x, fmt, amber_version=0)
+    assert new_x == x

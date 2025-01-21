@@ -98,6 +98,7 @@ class UnsupportedCoderVersion:
 class InvalidPayloadData:
     type_label: TypeLabel
     data: JsonType
+    msg: str | None = None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
