@@ -40,12 +40,7 @@ class CoderEncoded(typing.TypedDict):
 
 
 _JsonElement = bool | float | int | str | None
-# NOTE: static type checking does not see `Document` and `CoderEncoded` as subtypes of
-#   `JsonType`, even though at runtime they do adhere to the definition. To aid the type
-#   checker we therefore add them to this union explicitly.
-type JsonType = (
-    _JsonElement | list[JsonType] | dict[str, JsonType] | Document | CoderEncoded
-)
+type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
 TypeLabel = NewType("TypeLabel", str)
 """Represent a label for a type."""
@@ -214,7 +209,9 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
         return _encode_dict(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
     # We have handled all native types; now we delegate to the custom coders.
-    return _encode_custom(obj, fmt)
+    # NOTE: suppressing pyright's inability to reason that a `CoderEncoded` is a special
+    #   case of `JsonType`.
+    return _encode_custom(obj, fmt)  # pyright: ignore [reportReturnType]
 
 
 # TODO: should these be Coders for builtins?
