@@ -43,9 +43,19 @@ def test_unsupported_encode() -> None:
     assert amber.encode({3}, fmt) == amber.NoEncoderAvailable(value={3})
 
 
+def test_scalar_decode() -> None:
+    fmt = amber.SerialisationFormat(coders=())
+    amber_version = 0
+    assert amber.decode(None, fmt, amber_version) is None
+    assert amber.decode(2, fmt, amber_version) == 2
+    assert amber.decode(4.2, fmt, amber_version) == 4.2
+    assert amber.decode("moo", fmt, amber_version) == "moo"
+
+
 # FIXME: test decode basic types
 # FIXME: test decode basic types
 # FIXME: test decode basic types
+
 
 def test_document() -> None:
     fmt = amber.SerialisationFormat(coders=())
