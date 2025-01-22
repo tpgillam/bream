@@ -28,11 +28,15 @@ class ComplexCoder(amber.Coder[complex]):
         return {"real": value.real, "imag": value.imag}
 
     def decode(
-        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+        self,
+        data: amber.JsonType,
+        fmt: amber.SerialisationFormat,
+        coder_version: int,
+        amber_version: int,
     ) -> amber.DecodeError | complex:
-        del fmt
-        if version != 1:
-            return amber.UnsupportedCoderVersion(self.type_label, version)
+        del amber_version, fmt
+        if coder_version != 1:
+            return amber.UnsupportedCoderVersion(self.type_label, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
             return amber.InvalidPayloadData(self.type_label, data, "Invalid keys")
         if not isinstance(data["real"], float):

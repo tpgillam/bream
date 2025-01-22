@@ -11,6 +11,8 @@ if typing.TYPE_CHECKING:
 
 # FIXME: warning -- version 0 is for pre-alpha development and WILL be broken on a
 #   regular basis
+# FIXME: rename this (and key) to something like 'amber format version'? This should
+#   _not_ be confused with the version of the amber library itself.
 AMBER_VERSION = 0
 """This tracks the techniques used to serialise objects with amber.
 
@@ -87,6 +89,13 @@ class UnsupportedAmberVersion:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class NoDecoderAvailable:
+    """No decoder is available for the given type_label."""
+
+    type_label: TypeLabel
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class UnsupportedCoderVersion:
     """The version requested for deserialisation is not supported."""
 
@@ -107,7 +116,11 @@ class InvalidJson:
 
 
 DecodeError = (
-    UnsupportedAmberVersion | UnsupportedCoderVersion | InvalidPayloadData | InvalidJson
+    UnsupportedAmberVersion
+    | NoDecoderAvailable
+    | UnsupportedCoderVersion
+    | InvalidPayloadData
+    | InvalidJson
 )
 
 
@@ -168,12 +181,16 @@ class Coder[T](abc.ABC):
 
     @abc.abstractmethod
     def decode(
-        self, data: JsonType, fmt: SerialisationFormat, version: int
+        self,
+        data: JsonType,
+        fmt: SerialisationFormat,
+        coder_version: int,
+        amber_version: int,
     ) -> DecodeError | T:
-        """Decode `data`, assuming it was encoded with `version` of this coder.
+        """Decode `data`, assuming it was encoded with `coder_version` of this coder.
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
-        with `amber.decode` to decode any child entities.
+        and `amber_version` with `amber.decode` to decode any child entities.
 
         Will return a `DecodeError` if decoding isn't possible.
         """
@@ -194,15 +211,24 @@ class SerialisationFormat:
         """All `Coder` instances registered with this format."""
         return self._coders
 
-    def find_coder[T](self, obj: T) -> Coder[T] | None:
+    def find_coder_for_value[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
         spec = TypeSpec.from_type(type(obj))
         # PERF: we don't want this to be an O(N) lookup! Build some maps on construction
         #   to ensure that we don't do anything silly.
-        for coder in self.coders:
+        for coder in self._coders:
             if coder.type_spec == spec:
                 return coder
+        return None
 
+    def find_coder_for_type_label(
+        self, type_label: TypeLabel
+    ) -> Coder[typing.Any] | None:
+        """Find a suitable coder for `type_label`, or `None` if there isn't one."""
+        # PERF: make this not O(N)
+        for coder in self._coders:
+            if coder.type_label == type_label:
+                return coder
         return None
 
 
@@ -267,7 +293,7 @@ def _encode_dict(
 
 
 def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | CoderEncoded:
-    coder = fmt.find_coder(obj)
+    coder = fmt.find_coder_for_value(obj)
     if coder is None:
         return NoEncoderAvailable(obj)
 
@@ -304,7 +330,10 @@ def decode(
         return _decode_list(obj, fmt, amber_version)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
-        # FIXME: custom decoding goes here.
+        if Keys.type_label.value in obj:
+            # FIXME: if keys are not as expected here return appropriate error value.
+            #   (this will also fix the argument type error below)
+            return _decode_custom(obj, fmt, amber_version)
         return _decode_dict(obj, fmt, amber_version)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
@@ -341,3 +370,17 @@ def _decode_dict(
             return tmp
         res[k] = v
     return res
+
+
+def _decode_custom(
+    obj: CoderEncoded, fmt: SerialisationFormat, amber_version: int
+) -> DecodeError | object:
+    type_label = obj[Keys.type_label.value]
+    coder = fmt.find_coder_for_type_label(type_label)
+    if coder is None:
+        return NoDecoderAvailable(type_label)
+
+    version = obj[Keys.version.value]
+    payload = obj[Keys.payload.value]
+
+    return coder.decode(payload, fmt, version, amber_version)
