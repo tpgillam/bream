@@ -7,7 +7,7 @@ import typing
 from typing import NewType
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable
 
 # FIXME: warning -- version 0 is for pre-alpha development and WILL be broken on a
 #   regular basis
@@ -185,9 +185,17 @@ class SerialisationFormat:
     # version: int
     # """The current version of the serialisation format."""
 
-    def __init__(self, *, coders: Sequence[Coder[typing.Any]]) -> None:
-        # FIXME: ensure we don't have multiple coders for a given type. Test it.
-        self._coders = tuple(coders)
+    def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
+        # FIXME: reject coders for primitive json types
+        spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
+        for coder in coders:
+            spec = coder.type_spec
+            if spec in spec_to_coder:
+                msg = f"multiple coders for {coder.type_spec}"
+                raise ValueError(msg)
+            spec_to_coder[spec] = coder
+        self._spec_to_coder = spec_to_coder
+        self._coders = tuple(spec_to_coder.values())
 
     @property
     def coders(self) -> tuple[Coder[typing.Any], ...]:
@@ -196,14 +204,9 @@ class SerialisationFormat:
 
     def find_coder[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
+        # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
-        # PERF: we don't want this to be an O(N) lookup! Build some maps on construction
-        #   to ensure that we don't do anything silly.
-        for coder in self.coders:
-            if coder.type_spec == spec:
-                return coder
-
-        return None
+        return self._spec_to_coder.get(spec)
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
