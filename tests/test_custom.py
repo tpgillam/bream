@@ -30,11 +30,15 @@ class ComplexCoder(amber.Coder[complex]):
         return {"real": value.real, "imag": value.imag}
 
     def decode(
-        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+        self,
+        data: amber.JsonType,
+        fmt: amber.SerialisationFormat,
+        coder_version: int,
+        amber_version: int,
     ) -> amber.DecodeError | complex:
-        del fmt
-        if version != 1:
-            return amber.UnsupportedCoderVersion(self.type_label, version)
+        del amber_version, fmt
+        if coder_version != 1:
+            return amber.UnsupportedCoderVersion(self.type_label, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
             return amber.InvalidPayloadData(self.type_label, data, "Invalid keys")
         if not isinstance(data["real"], float):
@@ -69,9 +73,13 @@ class MooCoder(amber.Coder[Moo]):
         return {}
 
     def decode(
-        self, data: amber.JsonType, fmt: amber.SerialisationFormat, version: int
+        self,
+        data: amber.JsonType,
+        fmt: amber.SerialisationFormat,
+        coder_version: int,
+        amber_version: int,
     ) -> amber.DecodeError | Moo:
-        del data, fmt, version
+        del data, fmt, coder_version, amber_version
         return Moo()
 
 
@@ -94,8 +102,8 @@ def test_serialization_format_find_coder() -> None:
     coder_complex = ComplexCoder()
     coder_moo = MooCoder()
     fmt = amber.SerialisationFormat(coders=[coder_complex, coder_moo])
-    assert fmt.find_coder(0j) is coder_complex
-    assert fmt.find_coder(Moo()) is coder_moo
+    assert fmt.find_coder_for_value(0j) is coder_complex
+    assert fmt.find_coder_for_value(Moo()) is coder_moo
 
 
 def test_serialization_format_raises_on_clashes() -> None:
