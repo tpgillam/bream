@@ -29,7 +29,7 @@ reportShadowedImports = true
 reportUninitializedInstanceVariable = true
 reportUnnecessaryTypeIgnoreComment = true
 
-[tool.pytest]
+[tool.pytest.ini_options]
 addopts = "--tb=short --capture=no"
 testpaths = ["tests"]
 
