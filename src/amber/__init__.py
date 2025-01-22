@@ -186,6 +186,7 @@ class SerialisationFormat:
     # """The current version of the serialisation format."""
 
     def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
+        # FIXME: reject coders for primitive json types
         spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
         for coder in coders:
             spec = coder.type_spec
@@ -203,6 +204,7 @@ class SerialisationFormat:
 
     def find_coder[T](self, obj: T) -> Coder[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
+        # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
         return self._spec_to_coder.get(spec)
 
