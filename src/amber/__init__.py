@@ -106,7 +106,7 @@ class InvalidJson:
     data: object
 
 
-type DecodeError = (
+DecodeError = (
     UnsupportedAmberVersion | UnsupportedCoderVersion | InvalidPayloadData | InvalidJson
 )
 
@@ -316,18 +316,28 @@ def decode(
 def _decode_list(
     obj: list[JsonType], fmt: SerialisationFormat, amber_version: int
 ) -> DecodeError | list[object]:
-    # FIXME: gah we can't use a comprehension since we might get error values.
-    #   NB that we're not getting a linter error since the success path might just be an
-    #   'object'. We should probably use some kind of 'Result' type if avoiding
-    #   exceptions.
-    return [decode(x, fmt, amber_version) for x in obj]
+    res: list[object] = []
+    for x in obj:
+        tmp = decode(x, fmt, amber_version)
+        # FIXME: that we're not getting a linter error since the success path might just
+        # be an 'object'. We should probably use some kind of 'Result' type if avoiding
+        # exceptions.
+        if isinstance(tmp, DecodeError):
+            return tmp
+        res.append(x)
+    return res
 
 
 def _decode_dict(
     obj: dict[str, JsonType], fmt: SerialisationFormat, amber_version: int
 ) -> DecodeError | dict[str, object]:
-    # FIXME: gah we can't use a comprehension since we might get error values.
-    #   NB that we're not getting a linter error since the success path might just be an
-    #   'object'. We should probably use some kind of 'Result' type if avoiding
-    #   exceptions.
-    return {k: decode(v, fmt, amber_version) for k, v in obj.items()}
+    res: dict[str, object] = {}
+    for k, v in obj.items():
+        tmp = decode(v, fmt, amber_version)
+        # FIXME: that we're not getting a linter error since the success path might just
+        # be an 'object'. We should probably use some kind of 'Result' type if avoiding
+        # exceptions.
+        if isinstance(tmp, DecodeError):
+            return tmp
+        res[k] = v
+    return res
