@@ -99,5 +99,10 @@ def test_serialization_format_find_coder() -> None:
 
 
 def test_serialization_format_raises_on_clashes() -> None:
+    # We must catch two coders targeting the same type spec.
     with pytest.raises(ValueError, match="multiple coders"):
         amber.SerialisationFormat(coders=[ComplexCoder(), ComplexCoder()])
+    # We must catch repeated identical coders.
+    coder = ComplexCoder()
+    with pytest.raises(ValueError, match="multiple coders"):
+        amber.SerialisationFormat(coders=[coder, coder])

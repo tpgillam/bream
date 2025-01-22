@@ -188,10 +188,11 @@ class SerialisationFormat:
     def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
         spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
         for coder in coders:
-            previous = spec_to_coder.setdefault(coder.type_spec, coder)
-            if previous is not coder:
+            spec = coder.type_spec
+            if spec in spec_to_coder:
                 msg = f"multiple coders for {coder.type_spec}"
                 raise ValueError(msg)
+            spec_to_coder[spec] = coder
         self._spec_to_coder = spec_to_coder
         self._coders = tuple(spec_to_coder.values())
 
