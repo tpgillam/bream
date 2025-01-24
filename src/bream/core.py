@@ -272,23 +272,14 @@ def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | D
     return {Keys.bream_spec.value: BREAM_SPEC, Keys.payload.value: payload}
 
 
-def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
-    if not isinstance(x, str):
-        return False
-    return x not in Keys
-
-
 def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
+    # FIXME: isinstance is too lax here; should use type identity
     if isinstance(obj, _JsonElement):
         return obj
 
     # FIXME: isinstance is too lax here; should use type identity
     if isinstance(obj, list):
         return _encode_list(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
-
-    # # FIXME: isinstance is too lax here; should use type identity
-    # if isinstance(obj, dict):
-    #     return _encode_dict(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
     # We have handled all native types; now we delegate to the custom coders.
     # NOTE: suppressing pyright's inability to reason that a `CoderEncoded` is a special
@@ -306,22 +297,6 @@ def _encode_list(
         if isinstance(x_encoded, EncodeError):
             return x_encoded
         result.append(x_encoded)
-    return result
-
-
-def _encode_dict(
-    obj: dict[Any, Any], fmt: SerialisationFormat
-) -> EncodeError | dict[str, JsonType]:
-    result: dict[str, JsonType] = {}
-    for k, v in obj.items():
-        # TODO: Support non-string keys -- this will require a different representation
-        #   for a dict.
-        if not _is_valid_dict_key(k):
-            return UnencodableDictKey(k)
-        v_encoded = encode(v, fmt)
-        if isinstance(v_encoded, EncodeError):
-            return v_encoded
-        result[k] = v_encoded
     return result
 
 
@@ -347,7 +322,7 @@ def decode_document(
     return decode(obj=document["_payload"], fmt=fmt, bream_spec=document["_bream_spec"])
 
 
-def decode(  # noqa: PLR0911
+def decode(
     obj: JsonType, fmt: SerialisationFormat, bream_spec: int
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
@@ -361,11 +336,9 @@ def decode(  # noqa: PLR0911
         return _decode_list(obj, fmt, bream_spec)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
-        # if Keys.type_label.value in obj:
         if not _is_coder_encoded(obj):
             return InvalidCoderEncoded(obj)
         return _decode_custom(obj, fmt, bream_spec)
-        # return _decode_dict(obj, fmt, bream_spec)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
@@ -385,21 +358,6 @@ def _decode_list(
         if isinstance(tmp, DecodeError):
             return tmp
         res.append(x)
-    return res
-
-
-def _decode_dict(
-    obj: dict[str, JsonType], fmt: SerialisationFormat, bream_spec: int
-) -> DecodeError | dict[str, object]:
-    res: dict[str, object] = {}
-    for k, v in obj.items():
-        tmp = decode(v, fmt, bream_spec)
-        # FIXME: that we're not getting a linter error since the success path might just
-        # be an 'object'. We should probably use some kind of 'Result' type if avoiding
-        # exceptions.
-        if isinstance(tmp, DecodeError):
-            return tmp
-        res[k] = v
     return res
 
 
