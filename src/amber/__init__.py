@@ -46,6 +46,19 @@ class CoderEncoded(typing.TypedDict):
     _payload: JsonType
 
 
+def _is_coder_encoded(obj: dict[str, JsonType]) -> typing.TypeGuard[CoderEncoded]:
+    if obj.keys() != CoderEncoded.__annotations__.keys():
+        return False
+
+    if not isinstance(obj[Keys.type_label.value], str):
+        return False
+
+    if not isinstance(obj[Keys.version.value], int):
+        return False
+
+    return False
+
+
 _JsonElement = bool | float | int | str | None
 type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
@@ -104,6 +117,13 @@ class UnsupportedCoderVersion:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class InvalidCoderEncoded:
+    """Got an invalid structure that is similar to but not a `amber.CoderEncoded`."""
+
+    obj: dict[str, JsonType]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class InvalidPayloadData:
     type_label: TypeLabel
     data: JsonType
@@ -119,6 +139,7 @@ DecodeError = (
     UnsupportedAmberVersion
     | NoDecoderAvailable
     | UnsupportedCoderVersion
+    | InvalidCoderEncoded
     | InvalidPayloadData
     | InvalidJson
 )
@@ -338,8 +359,8 @@ def decode(
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
         if Keys.type_label.value in obj:
-            # FIXME: if keys are not as expected here return appropriate error value.
-            #   (this will also fix the argument type error below)
+            if not _is_coder_encoded(obj):
+                return InvalidCoderEncoded(obj)
             return _decode_custom(obj, fmt, amber_version)
         return _decode_dict(obj, fmt, amber_version)
 
