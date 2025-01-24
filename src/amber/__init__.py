@@ -92,8 +92,8 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedAmberVersion:
-    """The version of amber specified for deserialisation is unsupported."""
+class UnsupportedAmberSpec:
+    """The amber spec specified for deserialisation is unsupported."""
 
     amber_spec: int
 
@@ -133,7 +133,7 @@ class InvalidJson:
 
 
 DecodeError = (
-    UnsupportedAmberVersion
+    UnsupportedAmberSpec
     | NoDecoderAvailable
     | UnsupportedCoderVersion
     | InvalidCoderEncoded
@@ -340,7 +340,7 @@ def decode(  # noqa: PLR0911
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
     if amber_spec != 0:
-        return UnsupportedAmberVersion(amber_spec=amber_spec)
+        return UnsupportedAmberSpec(amber_spec=amber_spec)
 
     if isinstance(obj, _JsonElement):
         return obj
