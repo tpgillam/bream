@@ -4,7 +4,7 @@ import abc
 import dataclasses
 import enum
 import typing
-from typing import NewType
+from typing import Any, NewType
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable
@@ -198,24 +198,33 @@ class Coder[T](abc.ABC):
 
 @typing.final
 class SerialisationFormat:
-    # FIXME: do we want a version here?
-    # version: int
-    # """The current version of the serialisation format."""
+    """A serialisation format is conceptually a collection of coders.
 
-    def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
+    No two coders should have the same label, and no two coders should operate on the
+    same type.
+    """
+
+    def __init__(self, *, coders: Iterable[Coder[Any]]) -> None:
         # FIXME: reject coders for primitive json types
-        spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
+        spec_to_coder: dict[TypeSpec, Coder[Any]] = {}
+        label_to_coder: dict[TypeLabel, Coder[Any]] = {}
         for coder in coders:
             spec = coder.type_spec
+            label = coder.type_label
             if spec in spec_to_coder:
-                msg = f"multiple coders for {coder.type_spec}"
+                msg = f"multiple coders for type spec: {spec}"
+                raise ValueError(msg)
+            if label in label_to_coder:
+                msg = f"multiple coders for type label: {label}"
                 raise ValueError(msg)
             spec_to_coder[spec] = coder
+            label_to_coder[label] = coder
         self._spec_to_coder = spec_to_coder
+        self._label_to_coder = label_to_coder
         self._coders = tuple(spec_to_coder.values())
 
     @property
-    def coders(self) -> tuple[Coder[typing.Any], ...]:
+    def coders(self) -> tuple[Coder[Any], ...]:
         """All `Coder` instances registered with this format."""
         return self._coders
 
@@ -225,15 +234,9 @@ class SerialisationFormat:
         spec = TypeSpec.from_type(type(obj))
         return self._spec_to_coder.get(spec)
 
-    def find_coder_for_type_label(
-        self, type_label: TypeLabel
-    ) -> Coder[typing.Any] | None:
+    def find_coder_for_type_label(self, type_label: TypeLabel) -> Coder[Any] | None:
         """Find a suitable coder for `type_label`, or `None` if there isn't one."""
-        # PERF: make this not O(N)
-        for coder in self._coders:
-            if coder.type_label == type_label:
-                return coder
-        return None
+        return self._label_to_coder.get(type_label)
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
@@ -269,7 +272,7 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
 
 # TODO: should these be Coders for builtins?
 def _encode_list(
-    obj: list[typing.Any], fmt: SerialisationFormat
+    obj: list[Any], fmt: SerialisationFormat
 ) -> EncodeError | list[JsonType]:
     result: list[JsonType] = []
     for x in obj:
@@ -281,7 +284,7 @@ def _encode_list(
 
 
 def _encode_dict(
-    obj: dict[typing.Any, typing.Any], fmt: SerialisationFormat
+    obj: dict[Any, typing.Any], fmt: SerialisationFormat
 ) -> EncodeError | dict[str, JsonType]:
     result: dict[str, JsonType] = {}
     for k, v in obj.items():
