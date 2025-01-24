@@ -227,9 +227,9 @@ class Codec[T]:
 
 @typing.final
 class SerialisationFormat:
-    """A serialisation format is conceptually a collection of coders.
+    """A serialisation format is conceptually a collection of codecs.
 
-    No two coders should have the same label, and no two coders should operate on the
+    No two codecs should have the same label, and no two codecs should operate on the
     same type.
     """
 
@@ -254,12 +254,12 @@ class SerialisationFormat:
         self._label_to_codec = label_to_codec
 
     def find_codec_for_value[T](self, obj: T) -> Codec[T] | None:
-        """Find a suitable coder for `obj`, or `None` if there isn't one."""
+        """Find a suitable codec for `obj`, or `None` if there isn't one."""
         spec = TypeSpec.from_type(type(obj))
         return self._spec_to_codec.get(spec)
 
     def find_codec_for_type_label(self, type_label: TypeLabel) -> Codec[Any] | None:
-        """Find a suitable coder for `type_label`, or `None` if there isn't one."""
+        """Find a suitable codec for `type_label`, or `None` if there isn't one."""
         return self._label_to_codec.get(type_label)
 
 
