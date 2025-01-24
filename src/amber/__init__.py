@@ -109,7 +109,7 @@ class NoDecoderAvailable:
 class UnsupportedCoderVersion:
     """The version requested for deserialisation is not supported."""
 
-    type_label: TypeLabel
+    coder: Coder[Any]
     version_provided: int
 
 
@@ -122,7 +122,7 @@ class InvalidCoderEncoded:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class InvalidPayloadData:
-    type_label: TypeLabel
+    coder: Coder[Any]
     data: JsonType
     msg: str | None = None
 
@@ -143,30 +143,7 @@ DecodeError = (
 
 
 class Coder[T](abc.ABC):
-    """Encapsulate encoding & decoding for a specific type."""
-
-    @property
-    @abc.abstractmethod
-    def type_label(self) -> TypeLabel:
-        """A label for the type this encoder handles.
-
-        This should be an identifier that is unique within the format. It can NEVER be
-        changed once specified if wanting to maintain backwards compatibility.
-        """
-
-    # FIXME: I suspect neither the type_spec nor type_label should not actually live
-    #   on the coder. That's because two things are both decoupled from `version`.
-    #   If we move a type then we should change where we build the format, but hopefully
-    #   the coder itself doesn't have to be changed.
-    @property
-    @abc.abstractmethod
-    def type_spec(self) -> TypeSpec:
-        """The `TypeSpec` for the type that this coder can handle.
-
-        Note that changing the `TypeSpec` need not trigger a bump in the `version`. For
-        example, an `ImportableType` might be renamed, or moved to another module. This
-        means that the type spec changes.
-        """
+    """Encapsulate encoding & decoding for a type or types."""
 
     @property
     @abc.abstractmethod
@@ -214,6 +191,31 @@ class Coder[T](abc.ABC):
         """
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class Codec[T]:
+    """A combination of one particular type `T` and an associated coder."""
+
+    type_label: TypeLabel
+    """A label for the type `T` this codec handles.
+
+    This should be an identifier that is unique within a format. It can NEVER be changed
+    once specified if wanting to maintain backwards compatibility for this format.
+    """
+
+    type_spec: TypeSpec
+    """The `TypeSpec` for the type `T` that this codec handles.
+
+    Note that changing the `TypeSpec` need not trigger a bump in the `version`. For
+    example, an `ImportableType` might be renamed, or moved to another module. This
+    means that the type spec changes.
+    """
+
+    # FIXME: generic on Coder might need to be covariant? We might re-use the same
+    #   coder for multiple concrete coders.
+    coder: Coder[T]
+    """A strategy for encoding and decoding instances of `T`."""
+
+
 @typing.final
 class SerialisationFormat:
     """A serialisation format is conceptually a collection of coders.
@@ -222,39 +224,33 @@ class SerialisationFormat:
     same type.
     """
 
-    def __init__(self, *, coders: Iterable[Coder[Any]]) -> None:
+    def __init__(self, *, codecs: Iterable[Codec[Any]]) -> None:
         # FIXME: reject coders for primitive json types
-        spec_to_coder: dict[TypeSpec, Coder[Any]] = {}
-        label_to_coder: dict[TypeLabel, Coder[Any]] = {}
-        for coder in coders:
-            spec = coder.type_spec
-            label = coder.type_label
-            if spec in spec_to_coder:
+        spec_to_codec: dict[TypeSpec, Codec[Any]] = {}
+        label_to_codec: dict[TypeLabel, Codec[Any]] = {}
+        for codec in codecs:
+            spec = codec.type_spec
+            label = codec.type_label
+            if spec in spec_to_codec:
                 msg = f"multiple coders for type spec: {spec}"
                 raise ValueError(msg)
-            if label in label_to_coder:
+            if label in label_to_codec:
                 msg = f"multiple coders for type label: {label}"
                 raise ValueError(msg)
-            spec_to_coder[spec] = coder
-            label_to_coder[label] = coder
-        self._spec_to_coder = spec_to_coder
-        self._label_to_coder = label_to_coder
-        self._coders = tuple(spec_to_coder.values())
+            spec_to_codec[spec] = codec
+            label_to_codec[label] = codec
+        self._spec_to_codec = spec_to_codec
+        self._label_to_codec = label_to_codec
 
-    @property
-    def coders(self) -> tuple[Coder[Any], ...]:
-        """All `Coder` instances registered with this format."""
-        return self._coders
-
-    def find_coder_for_value[T](self, obj: T) -> Coder[T] | None:
+    def find_codec_for_value[T](self, obj: T) -> Codec[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
         # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
-        return self._spec_to_coder.get(spec)
+        return self._spec_to_codec.get(spec)
 
-    def find_coder_for_type_label(self, type_label: TypeLabel) -> Coder[Any] | None:
+    def find_codec_for_type_label(self, type_label: TypeLabel) -> Codec[Any] | None:
         """Find a suitable coder for `type_label`, or `None` if there isn't one."""
-        return self._label_to_coder.get(type_label)
+        return self._label_to_codec.get(type_label)
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
@@ -318,16 +314,16 @@ def _encode_dict(
 
 
 def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | CoderEncoded:
-    coder = fmt.find_coder_for_value(obj)
-    if coder is None:
+    codec = fmt.find_codec_for_value(obj)
+    if codec is None:
         return NoEncoderAvailable(obj)
 
-    payload = coder.encode(obj, fmt)
+    payload = codec.coder.encode(obj, fmt)
     if isinstance(payload, EncodeError):
         return payload
     return {
-        Keys.type_label.value: coder.type_label,
-        Keys.version.value: coder.version,
+        Keys.type_label.value: codec.type_label,
+        Keys.version.value: codec.coder.version,
         Keys.payload.value: payload,
     }
 
@@ -399,11 +395,11 @@ def _decode_custom(
     obj: CoderEncoded, fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | object:
     type_label = obj[Keys.type_label.value]
-    coder = fmt.find_coder_for_type_label(type_label)
-    if coder is None:
+    codec = fmt.find_codec_for_type_label(type_label)
+    if codec is None:
         return NoDecoderAvailable(type_label)
 
     version = obj[Keys.version.value]
     payload = obj[Keys.payload.value]
 
-    return coder.decode(payload, fmt, version, amber_spec)
+    return codec.coder.decode(payload, fmt, version, amber_spec)

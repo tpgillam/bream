@@ -12,14 +12,6 @@ class ComplexCoder(amber.Coder[complex]):
     """An demonstration coder for Python's `complex` type."""
 
     @property
-    def type_label(self) -> amber.TypeLabel:
-        return amber.TypeLabel("complex")
-
-    @property
-    def type_spec(self) -> amber.TypeSpec:
-        return amber.TypeSpec(module="builtins", name="complex")
-
-    @property
     def version(self) -> int:
         return 1
 
@@ -38,13 +30,13 @@ class ComplexCoder(amber.Coder[complex]):
     ) -> amber.DecodeError | complex:
         del amber_spec, fmt
         if coder_version != 1:
-            return amber.UnsupportedCoderVersion(self.type_label, coder_version)
+            return amber.UnsupportedCoderVersion(self, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return amber.InvalidPayloadData(self.type_label, data, "Invalid keys")
+            return amber.InvalidPayloadData(self, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return amber.InvalidPayloadData(self.type_label, data, "Invalid 'real'")
+            return amber.InvalidPayloadData(self, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return amber.InvalidPayloadData(self.type_label, data, "Invalid 'imag'")
+            return amber.InvalidPayloadData(self, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
 
 
@@ -54,14 +46,6 @@ class Moo:
 
 @typing.final
 class MooCoder(amber.Coder[Moo]):
-    @property
-    def type_label(self) -> amber.TypeLabel:
-        return amber.TypeLabel("Moo")
-
-    @property
-    def type_spec(self) -> amber.TypeSpec:
-        return amber.TypeSpec.from_type(Moo)
-
     @property
     def version(self) -> int:
         return 1
@@ -84,7 +68,15 @@ class MooCoder(amber.Coder[Moo]):
 
 
 def test_custom_complex() -> None:
-    fmt = amber.SerialisationFormat(coders=[ComplexCoder()])
+    fmt = amber.SerialisationFormat(
+        codecs=[
+            amber.Codec(
+                amber.TypeLabel("complex"),
+                amber.TypeSpec.from_type(complex),
+                ComplexCoder(),
+            )
+        ]
+    )
     x = 1 + 2j
     assert isinstance(x, complex)
     encoded_x = amber.encode(x, fmt)
@@ -98,19 +90,57 @@ def test_custom_complex() -> None:
     assert new_x == x
 
 
+def _some[T](x: T | None) -> T:
+    assert x is not None
+    return x
+
+
 def test_serialization_format_find_coder() -> None:
     coder_complex = ComplexCoder()
     coder_moo = MooCoder()
-    fmt = amber.SerialisationFormat(coders=[coder_complex, coder_moo])
-    assert fmt.find_coder_for_value(0j) is coder_complex
-    assert fmt.find_coder_for_value(Moo()) is coder_moo
+    fmt = amber.SerialisationFormat(
+        codecs=[
+            amber.Codec(
+                amber.TypeLabel("complex"),
+                amber.TypeSpec.from_type(complex),
+                coder_complex,
+            ),
+            amber.Codec(
+                amber.TypeLabel("Moo"), amber.TypeSpec.from_type(Moo), coder_moo
+            ),
+        ]
+    )
+    assert _some(fmt.find_codec_for_value(0j)).coder is coder_complex
+    assert _some(fmt.find_codec_for_value(Moo())).coder is coder_moo
 
 
 def test_serialization_format_raises_on_clashes() -> None:
     # We must catch two coders targeting the same type spec.
     with pytest.raises(ValueError, match="multiple coders"):
-        amber.SerialisationFormat(coders=[ComplexCoder(), ComplexCoder()])
+        amber.SerialisationFormat(
+            codecs=[
+                amber.Codec(
+                    amber.TypeLabel("complex"),
+                    amber.TypeSpec.from_type(complex),
+                    ComplexCoder(),
+                ),
+                amber.Codec(
+                    amber.TypeLabel("complex"),
+                    amber.TypeSpec.from_type(complex),
+                    ComplexCoder(),
+                ),
+            ]
+        )
     # We must catch repeated identical coders.
     coder = ComplexCoder()
     with pytest.raises(ValueError, match="multiple coders"):
-        amber.SerialisationFormat(coders=[coder, coder])
+        amber.SerialisationFormat(
+            codecs=[
+                amber.Codec(
+                    amber.TypeLabel("complex"), amber.TypeSpec.from_type(complex), coder
+                ),
+                amber.Codec(
+                    amber.TypeLabel("complex"), amber.TypeSpec.from_type(complex), coder
+                ),
+            ]
+        )
