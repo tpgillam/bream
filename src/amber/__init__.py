@@ -47,16 +47,11 @@ class CoderEncoded(typing.TypedDict):
 
 
 def _is_coder_encoded(obj: dict[str, JsonType]) -> typing.TypeGuard[CoderEncoded]:
-    if obj.keys() != CoderEncoded.__annotations__.keys():
-        return False
-
-    if not isinstance(obj[Keys.type_label.value], str):
-        return False
-
-    if not isinstance(obj[Keys.version.value], int):
-        return False
-
-    return False
+    return (
+        obj.keys() == CoderEncoded.__annotations__.keys()
+        and isinstance(obj[Keys.type_label.value], str)
+        and isinstance(obj[Keys.version.value], int)
+    )
 
 
 _JsonElement = bool | float | int | str | None
@@ -344,7 +339,7 @@ def decode_document(
     )
 
 
-def decode(
+def decode(  # noqa: PLR0911
     obj: JsonType, fmt: SerialisationFormat, amber_version: int
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
