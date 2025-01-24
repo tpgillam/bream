@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test_on_version:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: make test
+
+  test:
+    needs: [test_on_version]
 
   lint:
     runs-on: ubuntu-latest
