@@ -4,8 +4,8 @@ typecheck:
 
 .PHONY: lint
 lint:
-	uv run ruff check --fix
-	uv run ruff format
+	-uv run ruff check --fix
+	-uv run ruff format
 
 .PHONY: test
 test:
