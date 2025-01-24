@@ -2,6 +2,8 @@
 amber is currently in pre-alpha development, and does _NOT_ yet have a
     stable serialisation format.
 
+Any release in the 0.0.x series may contain breaking changes.
+
 Please do test-drive and give feedback, or else check back soon for a stable version!
 
 **END WARNING**   
