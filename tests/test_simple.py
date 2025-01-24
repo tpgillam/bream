@@ -45,11 +45,11 @@ def test_unsupported_encode() -> None:
 
 def test_scalar_decode() -> None:
     fmt = amber.SerialisationFormat(coders=())
-    amber_version = 0
-    assert amber.decode(None, fmt, amber_version) is None
-    assert amber.decode(2, fmt, amber_version) == 2
-    assert amber.decode(4.2, fmt, amber_version) == 4.2
-    assert amber.decode("moo", fmt, amber_version) == "moo"
+    amber_spec = 0
+    assert amber.decode(None, fmt, amber_spec) is None
+    assert amber.decode(2, fmt, amber_spec) == 2
+    assert amber.decode(4.2, fmt, amber_spec) == 4.2
+    assert amber.decode("moo", fmt, amber_spec) == "moo"
 
 
 # FIXME: test decode basic types
@@ -62,7 +62,7 @@ def test_simple_document_round_trip() -> None:
     for x in (None, 2, 4.2, "moo", [1, None, 3], {"a": [3, 4], "b": {"c": 4.2}}):
         document = amber.encode_to_document(x, fmt)
         assert not isinstance(document, amber.EncodeError)
-        assert document == {"_amber_version": amber.AMBER_VERSION, "_payload": x}
+        assert document == {"_amber_spec": amber.AMBER_SPEC, "_payload": x}
         new_x = amber.decode_document(document, fmt)
         assert new_x == x
         if isinstance(x, list | dict):

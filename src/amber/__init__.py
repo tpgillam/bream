@@ -9,21 +9,23 @@ from typing import Any, NewType
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable
 
-# FIXME: warning -- version 0 is for pre-alpha development and WILL be broken on a
+# FIXME: warning -- spec 0 is for pre-alpha development and WILL be broken on a
 #   regular basis
-# FIXME: rename this (and key) to something like 'amber format version'? This should
-#   _not_ be confused with the version of the amber library itself.
-AMBER_VERSION = 0
-"""This tracks the techniques used to serialise objects with amber.
+AMBER_SPEC = 0
+"""This integer will be incremented when the serialisation structure is changed.
 
-The version will be incremented whenever breaking changes are made to amber.
+Note that this is largely decoupled from the version of the `amber` package. We only
+guarantee that `AMBER_SPEC` will never decrease as the package version increases.
+
+This is useful because the Python API for using amber can change whilst the encoded
+representation stays the same.
 """
 
 
 class Keys(enum.Enum):
     """Special reserved keys for use in amber."""
 
-    amber_version = "_amber_version"
+    amber_spec = "_amber_spec"
     payload = "_payload"
     type_label = "_type"
     version = "_version"
@@ -34,7 +36,7 @@ class Keys(enum.Enum):
 class Document(typing.TypedDict):
     """The structure of an amber document."""
 
-    _amber_version: int
+    _amber_spec: int
     _payload: JsonType
 
 
@@ -93,7 +95,7 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 class UnsupportedAmberVersion:
     """The version of amber specified for deserialisation is unsupported."""
 
-    amber_version: int
+    amber_spec: int
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -201,12 +203,12 @@ class Coder[T](abc.ABC):
         data: JsonType,
         fmt: SerialisationFormat,
         coder_version: int,
-        amber_version: int,
+        amber_spec: int,
     ) -> DecodeError | T:
         """Decode `data`, assuming it was encoded with `coder_version` of this coder.
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
-        and `amber_version` with `amber.decode` to decode any child entities.
+        and `amber_spec` with `amber.decode` to decode any child entities.
 
         Will return a `DecodeError` if decoding isn't possible.
         """
@@ -261,7 +263,7 @@ def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | D
     if isinstance(payload, EncodeError):
         return payload
 
-    return {Keys.amber_version.value: AMBER_VERSION, Keys.payload.value: payload}
+    return {Keys.amber_spec.value: AMBER_SPEC, Keys.payload.value: payload}
 
 
 def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
@@ -334,30 +336,28 @@ def decode_document(
     document: Document, fmt: SerialisationFormat
 ) -> DecodeError | object:
     """Decode an amber document."""
-    return decode(
-        obj=document["_payload"], fmt=fmt, amber_version=document["_amber_version"]
-    )
+    return decode(obj=document["_payload"], fmt=fmt, amber_spec=document["_amber_spec"])
 
 
 def decode(  # noqa: PLR0911
-    obj: JsonType, fmt: SerialisationFormat, amber_version: int
+    obj: JsonType, fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
-    if amber_version != 0:
-        return UnsupportedAmberVersion(amber_version=amber_version)
+    if amber_spec != 0:
+        return UnsupportedAmberVersion(amber_spec=amber_spec)
 
     if isinstance(obj, _JsonElement):
         return obj
 
     if isinstance(obj, list):
-        return _decode_list(obj, fmt, amber_version)
+        return _decode_list(obj, fmt, amber_spec)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
         if Keys.type_label.value in obj:
             if not _is_coder_encoded(obj):
                 return InvalidCoderEncoded(obj)
-            return _decode_custom(obj, fmt, amber_version)
-        return _decode_dict(obj, fmt, amber_version)
+            return _decode_custom(obj, fmt, amber_spec)
+        return _decode_dict(obj, fmt, amber_spec)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
@@ -366,11 +366,11 @@ def decode(  # noqa: PLR0911
 
 
 def _decode_list(
-    obj: list[JsonType], fmt: SerialisationFormat, amber_version: int
+    obj: list[JsonType], fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | list[object]:
     res: list[object] = []
     for x in obj:
-        tmp = decode(x, fmt, amber_version)
+        tmp = decode(x, fmt, amber_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -381,11 +381,11 @@ def _decode_list(
 
 
 def _decode_dict(
-    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_version: int
+    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | dict[str, object]:
     res: dict[str, object] = {}
     for k, v in obj.items():
-        tmp = decode(v, fmt, amber_version)
+        tmp = decode(v, fmt, amber_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -396,7 +396,7 @@ def _decode_dict(
 
 
 def _decode_custom(
-    obj: CoderEncoded, fmt: SerialisationFormat, amber_version: int
+    obj: CoderEncoded, fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | object:
     type_label = obj[Keys.type_label.value]
     coder = fmt.find_coder_for_type_label(type_label)
@@ -406,4 +406,4 @@ def _decode_custom(
     version = obj[Keys.version.value]
     payload = obj[Keys.payload.value]
 
-    return coder.decode(payload, fmt, version, amber_version)
+    return coder.decode(payload, fmt, version, amber_spec)

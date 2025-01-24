@@ -34,9 +34,9 @@ class ComplexCoder(amber.Coder[complex]):
         data: amber.JsonType,
         fmt: amber.SerialisationFormat,
         coder_version: int,
-        amber_version: int,
+        amber_spec: int,
     ) -> amber.DecodeError | complex:
-        del amber_version, fmt
+        del amber_spec, fmt
         if coder_version != 1:
             return amber.UnsupportedCoderVersion(self.type_label, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
@@ -77,9 +77,9 @@ class MooCoder(amber.Coder[Moo]):
         data: amber.JsonType,
         fmt: amber.SerialisationFormat,
         coder_version: int,
-        amber_version: int,
+        amber_spec: int,
     ) -> amber.DecodeError | Moo:
-        del data, fmt, coder_version, amber_version
+        del data, fmt, coder_version, amber_spec
         return Moo()
 
 
@@ -94,7 +94,7 @@ def test_custom_complex() -> None:
         "_version": 1,
         "_payload": {"real": 1.0, "imag": 2.0},
     }
-    new_x = amber.decode(encoded_x, fmt, amber_version=0)
+    new_x = amber.decode(encoded_x, fmt, amber_spec=0)
     assert new_x == x
 
 

@@ -27,7 +27,7 @@ An amber tree is a `dict` with some metadata and a payload; any valid JSON tree 
 payload. For example:
 ```json
 {
-    "_amber_version": 1,
+    "_amber_spec": 1,
     "_payload": {
         "serialised": ["data", "goes", "here"]
     }
