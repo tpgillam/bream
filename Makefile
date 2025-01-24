@@ -1,3 +1,12 @@
+.PHONY: install
+install:
+	uv sync
+
+.PHONY: clean
+clean:
+	rm -rf dist/
+	find . -name '__pycache__' -exec rm -fr {} +
+
 .PHONY: typecheck
 typecheck:
 	uv run pyright
