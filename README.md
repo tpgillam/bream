@@ -15,7 +15,7 @@ Please do test-drive and give feedback, or else check back soon for a stable ver
 [![image](https://img.shields.io/pypi/v/bream.svg)](https://pypi.python.org/pypi/bream)
 [![image](https://img.shields.io/pypi/l/bream.svg)](https://github.com/tpgillam/bream/blob/main/LICENSE)
 [![image](https://img.shields.io/pypi/pyversions/bream.svg)](https://pypi.python.org/pypi/bream)
-[![Actions status](https://github.com/tpgillam/bream/workflows/CI/badge.svg)](https://github.com/tpgillam/bream/actions)
+[![Actions status](https://github.com/tpgillam/bream/workflows/ci/badge.svg)](https://github.com/tpgillam/bream/actions)
 
 `bream` is an explictly versioned encode/decode framework targetting JSON-like trees.
 
