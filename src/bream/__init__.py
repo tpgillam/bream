@@ -255,7 +255,6 @@ class SerialisationFormat:
 
     def find_codec_for_value[T](self, obj: T) -> Codec[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
-        # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
         return self._spec_to_codec.get(spec)
 
