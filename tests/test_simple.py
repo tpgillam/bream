@@ -52,9 +52,32 @@ def test_scalar_decode() -> None:
     assert bream.decode("moo", fmt, bream_spec) == "moo"
 
 
-# FIXME: test decode basic types
-# FIXME: test decode basic types
-# FIXME: test decode basic types
+def test_list_decode() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    bream_spec = 0
+    x: list[bream.JsonType] = [None, 2, 4.2, "moo"]
+    x_decoded = bream.decode(x, fmt, bream_spec)
+    assert x_decoded == x
+    assert x_decoded is not x
+
+
+def test_dict_decode() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    bream_spec = 0
+    x: dict[str, bream.JsonType] = {"a": None, "b": 2, "c": 4.2, "d": "moo"}
+    x_decoded = bream.decode(x, fmt, bream_spec)
+    assert x_decoded == x
+    assert x_decoded is not x
+
+
+def test_nested_structure_decode() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    bream_spec = 0
+    x: list[bream.JsonType] = [None, 2, 4.2, "moo"]
+    y: dict[str, bream.JsonType] = {"a": None, "b": 2, "c": 4.2, "d": "moo", "e": x}
+    y_decoded = bream.decode(y, fmt, bream_spec)
+    assert y_decoded == y
+    assert y_decoded is not y
 
 
 def test_simple_document_round_trip() -> None:
