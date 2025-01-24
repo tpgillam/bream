@@ -11,21 +11,21 @@ if typing.TYPE_CHECKING:
 
 # FIXME: warning -- spec 0 is for pre-alpha development and WILL be broken on a
 #   regular basis
-AMBER_SPEC = 0
+BREAM_SPEC = 0
 """This integer will be incremented when the serialisation structure is changed.
 
-Note that this is largely decoupled from the version of the `amber` package. We only
-guarantee that `AMBER_SPEC` will never decrease as the package version increases.
+Note that this is largely decoupled from the version of the `bream` package. We only
+guarantee that `BREAM_SPEC` will never decrease as the package version increases.
 
-This is useful because the Python API for using amber can change whilst the encoded
+This is useful because the Python API for using bream can change whilst the encoded
 representation stays the same.
 """
 
 
 class Keys(enum.Enum):
-    """Special reserved keys for use in amber."""
+    """Special reserved keys for use in bream."""
 
-    amber_spec = "_amber_spec"
+    bream_spec = "_bream_spec"
     payload = "_payload"
     type_label = "_type"
     version = "_version"
@@ -34,9 +34,9 @@ class Keys(enum.Enum):
 # FIXME: should the document also contain some kind of identifier for the format? This
 #    would mirror some property added to `SerialisationFormat`.
 class Document(typing.TypedDict):
-    """The structure of an amber document."""
+    """The structure of an bream document."""
 
-    _amber_spec: int
+    _bream_spec: int
     _payload: JsonType
 
 
@@ -92,10 +92,10 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedAmberSpec:
-    """The amber spec specified for deserialisation is unsupported."""
+class UnsupportedBreamSpec:
+    """The bream spec specified for deserialisation is unsupported."""
 
-    amber_spec: int
+    bream_spec: int
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -115,7 +115,7 @@ class UnsupportedCoderVersion:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class InvalidCoderEncoded:
-    """Got an invalid structure that is similar to but not a `amber.CoderEncoded`."""
+    """Got an invalid structure that is similar to but not a `bream.CoderEncoded`."""
 
     obj: dict[str, JsonType]
 
@@ -133,7 +133,7 @@ class InvalidJson:
 
 
 DecodeError = (
-    UnsupportedAmberSpec
+    UnsupportedBreamSpec
     | NoDecoderAvailable
     | UnsupportedCoderVersion
     | InvalidCoderEncoded
@@ -169,7 +169,7 @@ class Coder[T](abc.ABC):
         """Encode `value` using this coder's current version.
 
         Note that this must encode recursively. Implementers should use `fmt` with
-        `amber.encode` to encode any child entities.
+        `bream.encode` to encode any child entities.
 
         Will return an `EncodeError` if encoding isn't possible.
         """
@@ -180,12 +180,12 @@ class Coder[T](abc.ABC):
         data: JsonType,
         fmt: SerialisationFormat,
         coder_version: int,
-        amber_spec: int,
+        bream_spec: int,
     ) -> DecodeError | T:
         """Decode `data`, assuming it was encoded with `coder_version` of this coder.
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
-        and `amber_spec` with `amber.decode` to decode any child entities.
+        and `bream_spec` with `bream.decode` to decode any child entities.
 
         Will return a `DecodeError` if decoding isn't possible.
         """
@@ -254,12 +254,12 @@ class SerialisationFormat:
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
-    """Encode `obj`, and place inside an amber document."""
+    """Encode `obj`, and place inside an bream document."""
     payload = encode(obj, fmt)
     if isinstance(payload, EncodeError):
         return payload
 
-    return {Keys.amber_spec.value: AMBER_SPEC, Keys.payload.value: payload}
+    return {Keys.bream_spec.value: BREAM_SPEC, Keys.payload.value: payload}
 
 
 def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
@@ -331,29 +331,29 @@ def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | Coder
 def decode_document(
     document: Document, fmt: SerialisationFormat
 ) -> DecodeError | object:
-    """Decode an amber document."""
-    return decode(obj=document["_payload"], fmt=fmt, amber_spec=document["_amber_spec"])
+    """Decode an bream document."""
+    return decode(obj=document["_payload"], fmt=fmt, bream_spec=document["_bream_spec"])
 
 
 def decode(  # noqa: PLR0911
-    obj: JsonType, fmt: SerialisationFormat, amber_spec: int
+    obj: JsonType, fmt: SerialisationFormat, bream_spec: int
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
-    if amber_spec != 0:
-        return UnsupportedAmberSpec(amber_spec=amber_spec)
+    if bream_spec != 0:
+        return UnsupportedBreamSpec(bream_spec=bream_spec)
 
     if isinstance(obj, _JsonElement):
         return obj
 
     if isinstance(obj, list):
-        return _decode_list(obj, fmt, amber_spec)
+        return _decode_list(obj, fmt, bream_spec)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
         if Keys.type_label.value in obj:
             if not _is_coder_encoded(obj):
                 return InvalidCoderEncoded(obj)
-            return _decode_custom(obj, fmt, amber_spec)
-        return _decode_dict(obj, fmt, amber_spec)
+            return _decode_custom(obj, fmt, bream_spec)
+        return _decode_dict(obj, fmt, bream_spec)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
@@ -362,11 +362,11 @@ def decode(  # noqa: PLR0911
 
 
 def _decode_list(
-    obj: list[JsonType], fmt: SerialisationFormat, amber_spec: int
+    obj: list[JsonType], fmt: SerialisationFormat, bream_spec: int
 ) -> DecodeError | list[object]:
     res: list[object] = []
     for x in obj:
-        tmp = decode(x, fmt, amber_spec)
+        tmp = decode(x, fmt, bream_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -377,11 +377,11 @@ def _decode_list(
 
 
 def _decode_dict(
-    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_spec: int
+    obj: dict[str, JsonType], fmt: SerialisationFormat, bream_spec: int
 ) -> DecodeError | dict[str, object]:
     res: dict[str, object] = {}
     for k, v in obj.items():
-        tmp = decode(v, fmt, amber_spec)
+        tmp = decode(v, fmt, bream_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -392,7 +392,7 @@ def _decode_dict(
 
 
 def _decode_custom(
-    obj: CoderEncoded, fmt: SerialisationFormat, amber_spec: int
+    obj: CoderEncoded, fmt: SerialisationFormat, bream_spec: int
 ) -> DecodeError | object:
     type_label = obj[Keys.type_label.value]
     codec = fmt.find_codec_for_type_label(type_label)
@@ -402,4 +402,4 @@ def _decode_custom(
     version = obj[Keys.version.value]
     payload = obj[Keys.payload.value]
 
-    return codec.coder.decode(payload, fmt, version, amber_spec)
+    return codec.coder.decode(payload, fmt, version, bream_spec)
