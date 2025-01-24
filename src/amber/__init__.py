@@ -298,7 +298,7 @@ def _encode_list(
 
 
 def _encode_dict(
-    obj: dict[Any, typing.Any], fmt: SerialisationFormat
+    obj: dict[Any, Any], fmt: SerialisationFormat
 ) -> EncodeError | dict[str, JsonType]:
     result: dict[str, JsonType] = {}
     for k, v in obj.items():
