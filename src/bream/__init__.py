@@ -75,6 +75,15 @@ class TypeSpec:
         return TypeSpec(module=type_.__module__, name=type_.__name__)
 
 
+_JSON_TYPE_NAMES = frozenset(
+    x.__name__ for x in (bool, float, int, str, type(None), list, dict)
+)
+
+
+def _is_json_type_spec(spec: TypeSpec) -> bool:
+    return spec.module == "builtins" and spec.name in _JSON_TYPE_NAMES
+
+
 # TODO: these error types, or exceptions?
 
 
@@ -225,11 +234,13 @@ class SerialisationFormat:
     """
 
     def __init__(self, *, codecs: Iterable[Codec[Any]]) -> None:
-        # FIXME: reject coders for primitive json types
         spec_to_codec: dict[TypeSpec, Codec[Any]] = {}
         label_to_codec: dict[TypeLabel, Codec[Any]] = {}
         for codec in codecs:
             spec = codec.type_spec
+            if _is_json_type_spec(spec):
+                msg = f"cannot add codec for native JSON type: {spec}"
+                raise ValueError(msg)
             label = codec.type_label
             if spec in spec_to_codec:
                 msg = f"multiple codecs for type spec: {spec}"
@@ -244,7 +255,6 @@ class SerialisationFormat:
 
     def find_codec_for_value[T](self, obj: T) -> Codec[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
-        # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
         return self._spec_to_codec.get(spec)
 

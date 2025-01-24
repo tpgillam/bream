@@ -114,6 +114,20 @@ def test_serialization_format_find_coder() -> None:
     assert _some(fmt.find_codec_for_value(Moo())).coder is coder_moo
 
 
+def test_serialization_format_raises_for_json_codec() -> None:
+    for json_type in (bool, int, float, type(None), list, dict):
+        with pytest.raises(ValueError, match="cannot add codec for native JSON type"):
+            bream.SerialisationFormat(
+                codecs=[
+                    bream.Codec(
+                        bream.TypeLabel("moo"),
+                        bream.TypeSpec.from_type(json_type),
+                        MooCoder(),
+                    )
+                ]
+            )
+
+
 def test_serialization_format_raises_on_clashes() -> None:
     # We must catch two codecs targeting the same type spec.
     with pytest.raises(ValueError, match="multiple codecs for type spec"):
