@@ -115,25 +115,41 @@ def test_serialization_format_find_coder() -> None:
 
 
 def test_serialization_format_raises_on_clashes() -> None:
-    # We must catch two coders targeting the same type spec.
-    with pytest.raises(ValueError, match="multiple coders"):
+    # We must catch two codecs targeting the same type spec.
+    with pytest.raises(ValueError, match="multiple codecs for type spec"):
         amber.SerialisationFormat(
             codecs=[
                 amber.Codec(
-                    amber.TypeLabel("complex"),
+                    amber.TypeLabel("complex 1"),
                     amber.TypeSpec.from_type(complex),
                     ComplexCoder(),
                 ),
                 amber.Codec(
-                    amber.TypeLabel("complex"),
+                    amber.TypeLabel("complex 2"),
                     amber.TypeSpec.from_type(complex),
                     ComplexCoder(),
                 ),
             ]
         )
+
+    # We must catch two codecs with the same type label.
+    with pytest.raises(ValueError, match="multiple codecs for type label"):
+        amber.SerialisationFormat(
+            codecs=[
+                amber.Codec(
+                    amber.TypeLabel("dino"),
+                    amber.TypeSpec.from_type(complex),
+                    ComplexCoder(),
+                ),
+                amber.Codec(
+                    amber.TypeLabel("dino"), amber.TypeSpec.from_type(Moo), MooCoder()
+                ),
+            ]
+        )
+
     # We must catch repeated identical coders.
     coder = ComplexCoder()
-    with pytest.raises(ValueError, match="multiple coders"):
+    with pytest.raises(ValueError, match="multiple codecs"):
         amber.SerialisationFormat(
             codecs=[
                 amber.Codec(

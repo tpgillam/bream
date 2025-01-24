@@ -232,10 +232,10 @@ class SerialisationFormat:
             spec = codec.type_spec
             label = codec.type_label
             if spec in spec_to_codec:
-                msg = f"multiple coders for type spec: {spec}"
+                msg = f"multiple codecs for type spec: {spec}"
                 raise ValueError(msg)
             if label in label_to_codec:
-                msg = f"multiple coders for type label: {label}"
+                msg = f"multiple codecs for type label: {label}"
                 raise ValueError(msg)
             spec_to_codec[spec] = codec
             label_to_codec[label] = codec
