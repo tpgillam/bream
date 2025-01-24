@@ -23,7 +23,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv]
-dev-dependencies = ["ruff ==0.9.2", "pyright ==1.1.392.post0", "pytest >=7"]
+dev-dependencies = ["ruff ==0.9.3", "pyright ==1.1.392.post0", "pytest >=7"]
+python-preference = "only-managed"
+required-version = ">=0.5.24"
 
 [tool.pyright]
 typeCheckingMode = "strict"
@@ -42,6 +44,9 @@ reportUnnecessaryTypeIgnoreComment = true
 [tool.pytest.ini_options]
 addopts = "--tb=short --capture=no"
 testpaths = ["tests"]
+
+[tool.ruff]
+output-format = "concise"
 
 [tool.ruff.format]
 docstring-code-format = true
