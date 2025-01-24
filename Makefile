@@ -16,6 +16,11 @@ lint:
 	-uv run ruff check --fix
 	-uv run ruff format
 
+.PHONY: lint_no_fix
+lint_no_fix:
+	uv run ruff check
+	uv run ruff format --check
+
 .PHONY: test
 test:
 	uv run pytest
