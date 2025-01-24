@@ -4,26 +4,28 @@ import abc
 import dataclasses
 import enum
 import typing
-from typing import NewType
+from typing import Any, NewType
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable
 
-# FIXME: warning -- version 0 is for pre-alpha development and WILL be broken on a
+# FIXME: warning -- spec 0 is for pre-alpha development and WILL be broken on a
 #   regular basis
-# FIXME: rename this (and key) to something like 'amber format version'? This should
-#   _not_ be confused with the version of the amber library itself.
-AMBER_VERSION = 0
-"""This tracks the techniques used to serialise objects with amber.
+AMBER_SPEC = 0
+"""This integer will be incremented when the serialisation structure is changed.
 
-The version will be incremented whenever breaking changes are made to amber.
+Note that this is largely decoupled from the version of the `amber` package. We only
+guarantee that `AMBER_SPEC` will never decrease as the package version increases.
+
+This is useful because the Python API for using amber can change whilst the encoded
+representation stays the same.
 """
 
 
 class Keys(enum.Enum):
     """Special reserved keys for use in amber."""
 
-    amber_version = "_amber_version"
+    amber_spec = "_amber_spec"
     payload = "_payload"
     type_label = "_type"
     version = "_version"
@@ -34,7 +36,7 @@ class Keys(enum.Enum):
 class Document(typing.TypedDict):
     """The structure of an amber document."""
 
-    _amber_version: int
+    _amber_spec: int
     _payload: JsonType
 
 
@@ -44,6 +46,14 @@ class CoderEncoded(typing.TypedDict):
     _type: TypeLabel
     _version: int
     _payload: JsonType
+
+
+def _is_coder_encoded(obj: dict[str, JsonType]) -> typing.TypeGuard[CoderEncoded]:
+    return (
+        obj.keys() == CoderEncoded.__annotations__.keys()
+        and isinstance(obj[Keys.type_label.value], str)
+        and isinstance(obj[Keys.version.value], int)
+    )
 
 
 _JsonElement = bool | float | int | str | None
@@ -82,10 +92,10 @@ EncodeError = NoEncoderAvailable | UnencodableDictKey
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedAmberVersion:
-    """The version of amber specified for deserialisation is unsupported."""
+class UnsupportedAmberSpec:
+    """The amber spec specified for deserialisation is unsupported."""
 
-    amber_version: int
+    amber_spec: int
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -99,13 +109,20 @@ class NoDecoderAvailable:
 class UnsupportedCoderVersion:
     """The version requested for deserialisation is not supported."""
 
-    type_label: TypeLabel
+    coder: Coder[Any]
     version_provided: int
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class InvalidCoderEncoded:
+    """Got an invalid structure that is similar to but not a `amber.CoderEncoded`."""
+
+    obj: dict[str, JsonType]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class InvalidPayloadData:
-    type_label: TypeLabel
+    coder: Coder[Any]
     data: JsonType
     msg: str | None = None
 
@@ -116,39 +133,17 @@ class InvalidJson:
 
 
 DecodeError = (
-    UnsupportedAmberVersion
+    UnsupportedAmberSpec
     | NoDecoderAvailable
     | UnsupportedCoderVersion
+    | InvalidCoderEncoded
     | InvalidPayloadData
     | InvalidJson
 )
 
 
 class Coder[T](abc.ABC):
-    """Encapsulate encoding & decoding for a specific type."""
-
-    @property
-    @abc.abstractmethod
-    def type_label(self) -> TypeLabel:
-        """A label for the type this encoder handles.
-
-        This should be an identifier that is unique within the format. It can NEVER be
-        changed once specified if wanting to maintain backwards compatibility.
-        """
-
-    # FIXME: I suspect neither the type_spec nor type_label should not actually live
-    #   on the coder. That's because two things are both decoupled from `version`.
-    #   If we move a type then we should change where we build the format, but hopefully
-    #   the coder itself doesn't have to be changed.
-    @property
-    @abc.abstractmethod
-    def type_spec(self) -> TypeSpec:
-        """The `TypeSpec` for the type that this coder can handle.
-
-        Note that changing the `TypeSpec` need not trigger a bump in the `version`. For
-        example, an `ImportableType` might be renamed, or moved to another module. This
-        means that the type spec changes.
-        """
+    """Encapsulate encoding & decoding for a type or types."""
 
     @property
     @abc.abstractmethod
@@ -185,55 +180,77 @@ class Coder[T](abc.ABC):
         data: JsonType,
         fmt: SerialisationFormat,
         coder_version: int,
-        amber_version: int,
+        amber_spec: int,
     ) -> DecodeError | T:
         """Decode `data`, assuming it was encoded with `coder_version` of this coder.
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
-        and `amber_version` with `amber.decode` to decode any child entities.
+        and `amber_spec` with `amber.decode` to decode any child entities.
 
         Will return a `DecodeError` if decoding isn't possible.
         """
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class Codec[T]:
+    """A combination of one particular type `T` and an associated coder."""
+
+    type_label: TypeLabel
+    """A label for the type `T` this codec handles.
+
+    This should be an identifier that is unique within a format. It can NEVER be changed
+    once specified if wanting to maintain backwards compatibility for this format.
+    """
+
+    type_spec: TypeSpec
+    """The `TypeSpec` for the type `T` that this codec handles.
+
+    Note that changing the `TypeSpec` need not trigger a bump in the `version`. For
+    example, an `ImportableType` might be renamed, or moved to another module. This
+    means that the type spec changes.
+    """
+
+    # FIXME: generic on Coder might need to be covariant? We might re-use the same
+    #   coder for multiple concrete coders.
+    coder: Coder[T]
+    """A strategy for encoding and decoding instances of `T`."""
+
+
 @typing.final
 class SerialisationFormat:
-    # FIXME: do we want a version here?
-    # version: int
-    # """The current version of the serialisation format."""
+    """A serialisation format is conceptually a collection of coders.
 
-    def __init__(self, *, coders: Iterable[Coder[typing.Any]]) -> None:
+    No two coders should have the same label, and no two coders should operate on the
+    same type.
+    """
+
+    def __init__(self, *, codecs: Iterable[Codec[Any]]) -> None:
         # FIXME: reject coders for primitive json types
-        spec_to_coder: dict[TypeSpec, Coder[typing.Any]] = {}
-        for coder in coders:
-            spec = coder.type_spec
-            if spec in spec_to_coder:
-                msg = f"multiple coders for {coder.type_spec}"
+        spec_to_codec: dict[TypeSpec, Codec[Any]] = {}
+        label_to_codec: dict[TypeLabel, Codec[Any]] = {}
+        for codec in codecs:
+            spec = codec.type_spec
+            label = codec.type_label
+            if spec in spec_to_codec:
+                msg = f"multiple codecs for type spec: {spec}"
                 raise ValueError(msg)
-            spec_to_coder[spec] = coder
-        self._spec_to_coder = spec_to_coder
-        self._coders = tuple(spec_to_coder.values())
+            if label in label_to_codec:
+                msg = f"multiple codecs for type label: {label}"
+                raise ValueError(msg)
+            spec_to_codec[spec] = codec
+            label_to_codec[label] = codec
+        self._spec_to_codec = spec_to_codec
+        self._label_to_codec = label_to_codec
 
-    @property
-    def coders(self) -> tuple[Coder[typing.Any], ...]:
-        """All `Coder` instances registered with this format."""
-        return self._coders
-
-    def find_coder_for_value[T](self, obj: T) -> Coder[T] | None:
+    def find_codec_for_value[T](self, obj: T) -> Codec[T] | None:
         """Find a suitable coder for `obj`, or `None` if there isn't one."""
         # FIXME: reject coders for primitive json types
         spec = TypeSpec.from_type(type(obj))
-        return self._spec_to_coder.get(spec)
+        return self._spec_to_codec.get(spec)
 
-    def find_coder_for_type_label(
-        self, type_label: TypeLabel
-    ) -> Coder[typing.Any] | None:
+    def find_codec_for_type_label(self, type_label: TypeLabel) -> Codec[Any] | None:
         """Find a suitable coder for `type_label`, or `None` if there isn't one."""
-        # PERF: make this not O(N)
-        for coder in self._coders:
-            if coder.type_label == type_label:
-                return coder
-        return None
+        return self._label_to_codec.get(type_label)
 
 
 def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
@@ -242,7 +259,7 @@ def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | D
     if isinstance(payload, EncodeError):
         return payload
 
-    return {Keys.amber_version.value: AMBER_VERSION, Keys.payload.value: payload}
+    return {Keys.amber_spec.value: AMBER_SPEC, Keys.payload.value: payload}
 
 
 def _is_valid_dict_key(x: object) -> typing.TypeGuard[str]:
@@ -269,7 +286,7 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
 
 # TODO: should these be Coders for builtins?
 def _encode_list(
-    obj: list[typing.Any], fmt: SerialisationFormat
+    obj: list[Any], fmt: SerialisationFormat
 ) -> EncodeError | list[JsonType]:
     result: list[JsonType] = []
     for x in obj:
@@ -281,7 +298,7 @@ def _encode_list(
 
 
 def _encode_dict(
-    obj: dict[typing.Any, typing.Any], fmt: SerialisationFormat
+    obj: dict[Any, Any], fmt: SerialisationFormat
 ) -> EncodeError | dict[str, JsonType]:
     result: dict[str, JsonType] = {}
     for k, v in obj.items():
@@ -297,16 +314,16 @@ def _encode_dict(
 
 
 def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | CoderEncoded:
-    coder = fmt.find_coder_for_value(obj)
-    if coder is None:
+    codec = fmt.find_codec_for_value(obj)
+    if codec is None:
         return NoEncoderAvailable(obj)
 
-    payload = coder.encode(obj, fmt)
+    payload = codec.coder.encode(obj, fmt)
     if isinstance(payload, EncodeError):
         return payload
     return {
-        Keys.type_label.value: coder.type_label,
-        Keys.version.value: coder.version,
+        Keys.type_label.value: codec.type_label,
+        Keys.version.value: codec.coder.version,
         Keys.payload.value: payload,
     }
 
@@ -315,30 +332,28 @@ def decode_document(
     document: Document, fmt: SerialisationFormat
 ) -> DecodeError | object:
     """Decode an amber document."""
-    return decode(
-        obj=document["_payload"], fmt=fmt, amber_version=document["_amber_version"]
-    )
+    return decode(obj=document["_payload"], fmt=fmt, amber_spec=document["_amber_spec"])
 
 
-def decode(
-    obj: JsonType, fmt: SerialisationFormat, amber_version: int
+def decode(  # noqa: PLR0911
+    obj: JsonType, fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | object:
     # FIXME: version 0 should get a special error once we go stable.
-    if amber_version != 0:
-        return UnsupportedAmberVersion(amber_version=amber_version)
+    if amber_spec != 0:
+        return UnsupportedAmberSpec(amber_spec=amber_spec)
 
     if isinstance(obj, _JsonElement):
         return obj
 
     if isinstance(obj, list):
-        return _decode_list(obj, fmt, amber_version)
+        return _decode_list(obj, fmt, amber_spec)
 
     if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
         if Keys.type_label.value in obj:
-            # FIXME: if keys are not as expected here return appropriate error value.
-            #   (this will also fix the argument type error below)
-            return _decode_custom(obj, fmt, amber_version)
-        return _decode_dict(obj, fmt, amber_version)
+            if not _is_coder_encoded(obj):
+                return InvalidCoderEncoded(obj)
+            return _decode_custom(obj, fmt, amber_spec)
+        return _decode_dict(obj, fmt, amber_spec)
 
     # NOTE: strictly unreachable, but we're catching the case where the function has
     # been called in a manner that doesn't obey the static types.
@@ -347,11 +362,11 @@ def decode(
 
 
 def _decode_list(
-    obj: list[JsonType], fmt: SerialisationFormat, amber_version: int
+    obj: list[JsonType], fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | list[object]:
     res: list[object] = []
     for x in obj:
-        tmp = decode(x, fmt, amber_version)
+        tmp = decode(x, fmt, amber_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -362,11 +377,11 @@ def _decode_list(
 
 
 def _decode_dict(
-    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_version: int
+    obj: dict[str, JsonType], fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | dict[str, object]:
     res: dict[str, object] = {}
     for k, v in obj.items():
-        tmp = decode(v, fmt, amber_version)
+        tmp = decode(v, fmt, amber_spec)
         # FIXME: that we're not getting a linter error since the success path might just
         # be an 'object'. We should probably use some kind of 'Result' type if avoiding
         # exceptions.
@@ -377,14 +392,14 @@ def _decode_dict(
 
 
 def _decode_custom(
-    obj: CoderEncoded, fmt: SerialisationFormat, amber_version: int
+    obj: CoderEncoded, fmt: SerialisationFormat, amber_spec: int
 ) -> DecodeError | object:
     type_label = obj[Keys.type_label.value]
-    coder = fmt.find_coder_for_type_label(type_label)
-    if coder is None:
+    codec = fmt.find_codec_for_type_label(type_label)
+    if codec is None:
         return NoDecoderAvailable(type_label)
 
     version = obj[Keys.version.value]
     payload = obj[Keys.payload.value]
 
-    return coder.decode(payload, fmt, version, amber_version)
+    return codec.coder.decode(payload, fmt, version, amber_spec)

@@ -2,6 +2,8 @@
 amber is currently in pre-alpha development, and does _NOT_ yet have a
     stable serialisation format.
 
+Any release in the 0.0.x series may contain breaking changes.
+
 Please do test-drive and give feedback, or else check back soon for a stable version!
 
 **END WARNING**   
@@ -20,14 +22,14 @@ Please do test-drive and give feedback, or else check back soon for a stable ver
 It _does not_ aim to be fast. Speed isn't a current design goal.
 
 ## Data structure
-A JSON tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
+A JSON-like tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
 `float`, `str`, `bool` and `None`.
 
 An amber tree is a `dict` with some metadata and a payload; any valid JSON tree is a valid
 payload. For example:
 ```json
 {
-    "_amber_version": 1,
+    "_amber_spec": 1,
     "_payload": {
         "serialised": ["data", "goes", "here"]
     }

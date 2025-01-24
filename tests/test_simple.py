@@ -4,7 +4,7 @@ import amber
 
 
 def test_scalar_encode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     assert amber.encode(None, fmt) is None
     assert amber.encode(2, fmt) == 2
     assert amber.encode(4.2, fmt) == 4.2
@@ -12,7 +12,7 @@ def test_scalar_encode() -> None:
 
 
 def test_list_encode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     x = [None, 2, 4.2, "moo"]
     x_encoded = amber.encode(x, fmt)
     assert x_encoded == x
@@ -20,7 +20,7 @@ def test_list_encode() -> None:
 
 
 def test_dict_encode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     x = {"a": None, "b": 2, "c": 4.2, "d": "moo"}
     x_encoded = amber.encode(x, fmt)
     assert x_encoded == x
@@ -28,7 +28,7 @@ def test_dict_encode() -> None:
 
 
 def test_nested_structure_encode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     x = [None, 2, 4.2, "moo"]
     y = {"a": None, "b": 2, "c": 4.2, "d": "moo", "e": x}
     y_encoded = amber.encode(y, fmt)
@@ -37,19 +37,19 @@ def test_nested_structure_encode() -> None:
 
 
 def test_unsupported_encode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     assert amber.encode(1j, fmt) == amber.NoEncoderAvailable(value=1j)
     assert amber.encode((42,), fmt) == amber.NoEncoderAvailable(value=(42,))
     assert amber.encode({3}, fmt) == amber.NoEncoderAvailable(value={3})
 
 
 def test_scalar_decode() -> None:
-    fmt = amber.SerialisationFormat(coders=())
-    amber_version = 0
-    assert amber.decode(None, fmt, amber_version) is None
-    assert amber.decode(2, fmt, amber_version) == 2
-    assert amber.decode(4.2, fmt, amber_version) == 4.2
-    assert amber.decode("moo", fmt, amber_version) == "moo"
+    fmt = amber.SerialisationFormat(codecs=())
+    amber_spec = 0
+    assert amber.decode(None, fmt, amber_spec) is None
+    assert amber.decode(2, fmt, amber_spec) == 2
+    assert amber.decode(4.2, fmt, amber_spec) == 4.2
+    assert amber.decode("moo", fmt, amber_spec) == "moo"
 
 
 # FIXME: test decode basic types
@@ -58,11 +58,11 @@ def test_scalar_decode() -> None:
 
 
 def test_simple_document_round_trip() -> None:
-    fmt = amber.SerialisationFormat(coders=())
+    fmt = amber.SerialisationFormat(codecs=())
     for x in (None, 2, 4.2, "moo", [1, None, 3], {"a": [3, 4], "b": {"c": 4.2}}):
         document = amber.encode_to_document(x, fmt)
         assert not isinstance(document, amber.EncodeError)
-        assert document == {"_amber_version": amber.AMBER_VERSION, "_payload": x}
+        assert document == {"_amber_spec": amber.AMBER_SPEC, "_payload": x}
         new_x = amber.decode_document(document, fmt)
         assert new_x == x
         if isinstance(x, list | dict):
