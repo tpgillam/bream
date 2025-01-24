@@ -4,11 +4,11 @@ import typing
 
 import pytest
 
-import amber
+import bream
 
 
 @typing.final
-class ComplexCoder(amber.Coder[complex]):
+class ComplexCoder(bream.Coder[complex]):
     """An demonstration coder for Python's `complex` type."""
 
     @property
@@ -16,27 +16,27 @@ class ComplexCoder(amber.Coder[complex]):
         return 1
 
     def encode(
-        self, value: complex, fmt: amber.SerialisationFormat
-    ) -> amber.EncodeError | amber.JsonType:
+        self, value: complex, fmt: bream.SerialisationFormat
+    ) -> bream.EncodeError | bream.JsonType:
         del fmt
         return {"real": value.real, "imag": value.imag}
 
     def decode(
         self,
-        data: amber.JsonType,
-        fmt: amber.SerialisationFormat,
+        data: bream.JsonType,
+        fmt: bream.SerialisationFormat,
         coder_version: int,
-        amber_spec: int,
-    ) -> amber.DecodeError | complex:
-        del amber_spec, fmt
+        bream_spec: int,
+    ) -> bream.DecodeError | complex:
+        del bream_spec, fmt
         if coder_version != 1:
-            return amber.UnsupportedCoderVersion(self, coder_version)
+            return bream.UnsupportedCoderVersion(self, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return amber.InvalidPayloadData(self, data, "Invalid keys")
+            return bream.InvalidPayloadData(self, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return amber.InvalidPayloadData(self, data, "Invalid 'real'")
+            return bream.InvalidPayloadData(self, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return amber.InvalidPayloadData(self, data, "Invalid 'imag'")
+            return bream.InvalidPayloadData(self, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
 
 
@@ -45,48 +45,48 @@ class Moo:
 
 
 @typing.final
-class MooCoder(amber.Coder[Moo]):
+class MooCoder(bream.Coder[Moo]):
     @property
     def version(self) -> int:
         return 1
 
     def encode(
-        self, value: Moo, fmt: amber.SerialisationFormat
-    ) -> amber.EncodeError | amber.JsonType:
+        self, value: Moo, fmt: bream.SerialisationFormat
+    ) -> bream.EncodeError | bream.JsonType:
         del value, fmt
         return {}
 
     def decode(
         self,
-        data: amber.JsonType,
-        fmt: amber.SerialisationFormat,
+        data: bream.JsonType,
+        fmt: bream.SerialisationFormat,
         coder_version: int,
-        amber_spec: int,
-    ) -> amber.DecodeError | Moo:
-        del data, fmt, coder_version, amber_spec
+        bream_spec: int,
+    ) -> bream.DecodeError | Moo:
+        del data, fmt, coder_version, bream_spec
         return Moo()
 
 
 def test_custom_complex() -> None:
-    fmt = amber.SerialisationFormat(
+    fmt = bream.SerialisationFormat(
         codecs=[
-            amber.Codec(
-                amber.TypeLabel("complex"),
-                amber.TypeSpec.from_type(complex),
+            bream.Codec(
+                bream.TypeLabel("complex"),
+                bream.TypeSpec.from_type(complex),
                 ComplexCoder(),
             )
         ]
     )
     x = 1 + 2j
     assert isinstance(x, complex)
-    encoded_x = amber.encode(x, fmt)
-    assert not isinstance(encoded_x, amber.EncodeError)
+    encoded_x = bream.encode(x, fmt)
+    assert not isinstance(encoded_x, bream.EncodeError)
     assert encoded_x == {
         "_type": "complex",
         "_version": 1,
         "_payload": {"real": 1.0, "imag": 2.0},
     }
-    new_x = amber.decode(encoded_x, fmt, amber_spec=0)
+    new_x = bream.decode(encoded_x, fmt, bream_spec=0)
     assert new_x == x
 
 
@@ -98,15 +98,15 @@ def _some[T](x: T | None) -> T:
 def test_serialization_format_find_coder() -> None:
     coder_complex = ComplexCoder()
     coder_moo = MooCoder()
-    fmt = amber.SerialisationFormat(
+    fmt = bream.SerialisationFormat(
         codecs=[
-            amber.Codec(
-                amber.TypeLabel("complex"),
-                amber.TypeSpec.from_type(complex),
+            bream.Codec(
+                bream.TypeLabel("complex"),
+                bream.TypeSpec.from_type(complex),
                 coder_complex,
             ),
-            amber.Codec(
-                amber.TypeLabel("Moo"), amber.TypeSpec.from_type(Moo), coder_moo
+            bream.Codec(
+                bream.TypeLabel("Moo"), bream.TypeSpec.from_type(Moo), coder_moo
             ),
         ]
     )
@@ -117,16 +117,16 @@ def test_serialization_format_find_coder() -> None:
 def test_serialization_format_raises_on_clashes() -> None:
     # We must catch two codecs targeting the same type spec.
     with pytest.raises(ValueError, match="multiple codecs for type spec"):
-        amber.SerialisationFormat(
+        bream.SerialisationFormat(
             codecs=[
-                amber.Codec(
-                    amber.TypeLabel("complex 1"),
-                    amber.TypeSpec.from_type(complex),
+                bream.Codec(
+                    bream.TypeLabel("complex 1"),
+                    bream.TypeSpec.from_type(complex),
                     ComplexCoder(),
                 ),
-                amber.Codec(
-                    amber.TypeLabel("complex 2"),
-                    amber.TypeSpec.from_type(complex),
+                bream.Codec(
+                    bream.TypeLabel("complex 2"),
+                    bream.TypeSpec.from_type(complex),
                     ComplexCoder(),
                 ),
             ]
@@ -134,15 +134,15 @@ def test_serialization_format_raises_on_clashes() -> None:
 
     # We must catch two codecs with the same type label.
     with pytest.raises(ValueError, match="multiple codecs for type label"):
-        amber.SerialisationFormat(
+        bream.SerialisationFormat(
             codecs=[
-                amber.Codec(
-                    amber.TypeLabel("dino"),
-                    amber.TypeSpec.from_type(complex),
+                bream.Codec(
+                    bream.TypeLabel("dino"),
+                    bream.TypeSpec.from_type(complex),
                     ComplexCoder(),
                 ),
-                amber.Codec(
-                    amber.TypeLabel("dino"), amber.TypeSpec.from_type(Moo), MooCoder()
+                bream.Codec(
+                    bream.TypeLabel("dino"), bream.TypeSpec.from_type(Moo), MooCoder()
                 ),
             ]
         )
@@ -150,13 +150,13 @@ def test_serialization_format_raises_on_clashes() -> None:
     # We must catch repeated identical coders.
     coder = ComplexCoder()
     with pytest.raises(ValueError, match="multiple codecs"):
-        amber.SerialisationFormat(
+        bream.SerialisationFormat(
             codecs=[
-                amber.Codec(
-                    amber.TypeLabel("complex"), amber.TypeSpec.from_type(complex), coder
+                bream.Codec(
+                    bream.TypeLabel("complex"), bream.TypeSpec.from_type(complex), coder
                 ),
-                amber.Codec(
-                    amber.TypeLabel("complex"), amber.TypeSpec.from_type(complex), coder
+                bream.Codec(
+                    bream.TypeLabel("complex"), bream.TypeSpec.from_type(complex), coder
                 ),
             ]
         )

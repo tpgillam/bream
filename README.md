@@ -1,5 +1,5 @@
 # **WARNING** 
-amber is currently in pre-alpha development, and does _NOT_ yet have a
+bream is currently in pre-alpha development, and does _NOT_ yet have a
     stable serialisation format.
 
 Any release in the 0.0.x series may contain breaking changes.
@@ -10,11 +10,11 @@ Please do test-drive and give feedback, or else check back soon for a stable ver
 
 ---
 
-# amber
-`amber` is an explictly versioned encode/decode framework targetting JSON-like trees.
+# bream
+`bream` is an explictly versioned encode/decode framework targetting JSON-like trees.
 
 ## Goals and non-goals
-`amber` aims to be the following:
+`bream` aims to be the following:
 - Simple: encode to a human-readable JSON tree.
 - Explicit: no silent conversion. User-provided versions, easy upgrades.
 - Modular: bring-your-own codecs.
@@ -25,18 +25,18 @@ It _does not_ aim to be fast. Speed isn't a current design goal.
 A JSON-like tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
 `float`, `str`, `bool` and `None`.
 
-An amber tree is a `dict` with some metadata and a payload; any valid JSON tree is a valid
+An bream tree is a `dict` with some metadata and a payload; any valid JSON tree is a valid
 payload. For example:
 ```json
 {
-    "_amber_spec": 1,
+    "_bream_spec": 1,
     "_payload": {
         "serialised": ["data", "goes", "here"]
     }
 }
 ```
 
-Any JSON tree is a valid amber payload.
+Any JSON tree is a valid bream payload.
 
 ## Encoded objects
 Certain JSON trees within a payload represent 'encoded' Python objects. Any such tree
@@ -62,7 +62,7 @@ object.
 
 
 ## Advantages of versioning
-The main advantage of explicitly encoding & decoding your objects with amber is the
+The main advantage of explicitly encoding & decoding your objects with bream is the
 ability to _version_ the encoded form, and then provide a "compatibility decode" pathway
 to decode an older encoded representation into the latest in-memory representation.
 

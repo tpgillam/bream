@@ -1,5 +1,5 @@
 [project]
-name = "amber"
+name = "bream"
 version = "0.0.1"
 description = "Explicitly versioned JSON serialisation"
 readme = "README.md"
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-urls = { Homepage = "https://github.com/tpgillam/amber" }
+urls = { Homepage = "https://github.com/tpgillam/bream" }
 dependencies = []
 
 [build-system]
@@ -139,6 +139,6 @@ ban-relative-imports = "all"
 convention = "google"
 
 [tool.ruff.lint.isort]
-known-first-party = ["amber"]
+known-first-party = ["bream"]
 required-imports = ["from __future__ import annotations"]
 split-on-trailing-comma = false
