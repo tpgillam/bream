@@ -45,6 +45,9 @@ reportUnnecessaryTypeIgnoreComment = true
 addopts = "--tb=short --capture=no"
 testpaths = ["tests"]
 
+[tool.ruff]
+output-format = "concise"
+
 [tool.ruff.format]
 docstring-code-format = true
 skip-magic-trailing-comma = true
