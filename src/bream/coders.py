@@ -49,7 +49,7 @@ class DictCoder(Coder[dict[object, object]]):
     ) -> DecodeError | dict[object, object]:
         if coder_version != 1:
             return UnsupportedCoderVersion(self, coder_version)
-        if not isinstance(data, list):
+        if type(data) is not list:
             return InvalidPayloadData(self, data)
         result: dict[object, object] = {}
         for encoded_item in data:

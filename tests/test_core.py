@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import bream
 from bream.core import EncodeError
 
@@ -72,3 +74,27 @@ def test_simple_document_round_trip() -> None:
             assert document["_payload"] is not x
             assert new_x is not document["_payload"]
             assert new_x is not x
+
+
+class _MyFloat(float):
+    pass
+
+
+def test_float_subtype_not_accepted() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    x = _MyFloat(1)
+    assert isinstance(x, float)
+    x_encoded = bream.encode(x, fmt)
+    assert x_encoded == bream.core.NoEncoderAvailable(x)
+
+
+class _MyList(list[Any]):
+    pass
+
+
+def test_list_subtype_not_accepted() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    x = _MyList([1, 2, 3])
+    assert isinstance(x, list)
+    x_encoded = bream.encode(x, fmt)
+    assert x_encoded == bream.core.NoEncoderAvailable(x)

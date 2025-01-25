@@ -56,7 +56,7 @@ def _is_coder_encoded(obj: dict[str, JsonType]) -> typing.TypeGuard[CoderEncoded
     )
 
 
-_JsonElement = bool | float | int | str | None
+type _JsonElement = bool | float | int | str | None
 type JsonType = _JsonElement | list[JsonType] | dict[str, JsonType]
 
 TypeLabel = NewType("TypeLabel", str)
@@ -75,16 +75,20 @@ class TypeSpec:
         return TypeSpec(module=type_.__module__, name=type_.__name__)
 
 
-_NATIVE_TYPE_NAMES = frozenset(
-    x.__name__ for x in (bool, float, int, str, type(None), list)
-)
+_ELEMENT_TYPES = frozenset((bool, float, int, str, type(None)))
+
+
+def _is_native_element(obj: object) -> typing.TypeGuard[_JsonElement]:
+    # We do not use `isinstance` because we do not want to allow subtypes of known
+    # element types to be accepted.
+    return type(obj) in _ELEMENT_TYPES
+
+
+_NATIVE_TYPE_NAMES = frozenset(x.__name__ for x in (*_ELEMENT_TYPES, list))
 
 
 def _is_native_type(spec: TypeSpec) -> bool:
     return spec.module == "builtins" and spec.name in _NATIVE_TYPE_NAMES
-
-
-# TODO: these error types, or exceptions?
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -273,12 +277,10 @@ def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | D
 
 
 def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
-    # FIXME: isinstance is too lax here; should use type identity
-    if isinstance(obj, _JsonElement):
+    if _is_native_element(obj):
         return obj
 
-    # FIXME: isinstance is too lax here; should use type identity
-    if isinstance(obj, list):
+    if type(obj) is list:
         return _encode_list(obj, fmt)  # pyright: ignore [reportUnknownArgumentType]
 
     # We have handled all native types; now we delegate to the custom coders.
@@ -329,20 +331,17 @@ def decode(
     if bream_spec != 0:
         return UnsupportedBreamSpec(bream_spec=bream_spec)
 
-    if isinstance(obj, _JsonElement):
+    if _is_native_element(obj):
         return obj
 
-    if isinstance(obj, list):
+    if type(obj) is list:
         return _decode_list(obj, fmt, bream_spec)
 
-    if isinstance(obj, dict):  # pyright: ignore [reportUnnecessaryIsInstance]
+    if type(obj) is dict:
         if not _is_coder_encoded(obj):
             return InvalidCoderEncoded(obj)
         return _decode_custom(obj, fmt, bream_spec)
 
-    # NOTE: strictly unreachable, but we're catching the case where the function has
-    # been called in a manner that doesn't obey the static types.
-    typing.assert_never(obj)
     return InvalidJson(obj)
 
 
