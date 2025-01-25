@@ -2,7 +2,7 @@ name: Publish
 
 on:
   push:
-    branch: ["tg/autorelease"]  # FIXME: testing
+    branches: ["tg/autorelease"]  # FIXME: testing
     tags: ["*.*.*"]
 
 
