@@ -72,3 +72,15 @@ def test_simple_document_round_trip() -> None:
             assert document["_payload"] is not x
             assert new_x is not document["_payload"]
             assert new_x is not x
+
+
+class _MyFloat(float):
+    pass
+
+
+def test_element_subtype_not_accepted() -> None:
+    fmt = bream.SerialisationFormat(codecs=())
+    x = _MyFloat(1)
+    assert isinstance(x, float)
+    x_encoded = bream.encode(x, fmt)
+    assert x_encoded == bream.core.NoEncoderAvailable(x)
