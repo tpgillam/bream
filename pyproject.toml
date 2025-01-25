@@ -1,6 +1,6 @@
 [project]
 name = "bream"
-version = "0.0.1"
+version = "0.0.2"
 description = "Explicitly versioned JSON serialisation"
 readme = "README.md"
 authors = [{ name = "Tom Gillam", email = "tpgillam@googlemail.com" }]
