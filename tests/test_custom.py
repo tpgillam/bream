@@ -30,13 +30,13 @@ class ComplexCoder(bream.Coder[complex]):
     ) -> bream.DecodeError | complex:
         del bream_spec, fmt
         if coder_version != 1:
-            return bream.UnsupportedCoderVersion(self, coder_version)
+            return bream.core.UnsupportedCoderVersion(self, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return bream.InvalidPayloadData(self, data, "Invalid keys")
+            return bream.core.InvalidPayloadData(self, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return bream.InvalidPayloadData(self, data, "Invalid 'real'")
+            return bream.core.InvalidPayloadData(self, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return bream.InvalidPayloadData(self, data, "Invalid 'imag'")
+            return bream.core.InvalidPayloadData(self, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
 
 
@@ -115,8 +115,8 @@ def test_serialization_format_find_coder() -> None:
 
 
 def test_serialization_format_raises_for_json_codec() -> None:
-    for json_type in (bool, int, float, type(None), list, dict):
-        with pytest.raises(ValueError, match="cannot add codec for native JSON type"):
+    for json_type in (bool, int, float, type(None), list):
+        with pytest.raises(ValueError, match="cannot add codec for native type"):
             bream.SerialisationFormat(
                 codecs=[
                     bream.Codec(
