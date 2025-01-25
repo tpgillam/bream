@@ -1,0 +1,11 @@
+name: Publish
+
+on:
+  push:
+    branch: ["tg/autorelease"]  # FIXME: testing
+    tags: ["*.*.*"]
+
+
+jobs:
+  call-ci:
+    uses: ./.github/workflows/ci.yml
