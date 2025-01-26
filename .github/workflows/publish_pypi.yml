@@ -41,5 +41,7 @@ jobs:
     permissions:
       # Required for trusted publishing; see https://docs.pypi.org/trusted-publishers/using-a-publisher/
       id-token: write  
+    steps:
+      - run: exit 0
 
 
