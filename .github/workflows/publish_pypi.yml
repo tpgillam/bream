@@ -3,19 +3,42 @@ name: Publish
 on:
   push:
     branches: ["tg/autorelease"]  # FIXME: testing
-    tags: ["*.*.*"]
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
 
 
 jobs:
-  # FIXME: check that our git tag matches the version in pyproject.toml
-  
+  check-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # Workaround; see https://github.com/astral-sh/uv/issues/6298
+      - run: |
+        VERSION=$(uv tool run --from toml-cli toml get --toml-path=pyproject.toml project.version)
+        echo "{{ github.ref }}"
+        if [[ "{{ github.ref }}" != "refs/tags/$VERSION" ]]; then
+          exit 1
+        fi
+
   call-ci:
     uses: ./.github/workflows/ci.yml
 
   build:
     runs-on: ubuntu-latest
-    needs: [call-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-source
+          path: dist/*
+
+  upload_pypi:
+    needs: [build, call-ci, check-tag]
+    environment: release
+    permissions:
+      # Required for trusted publishing; see https://docs.pypi.org/trusted-publishers/using-a-publisher/
+      id-token: write  
+
+
