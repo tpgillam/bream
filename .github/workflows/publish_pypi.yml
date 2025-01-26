@@ -2,7 +2,6 @@ name: Publish
 
 on:
   push:
-    branches: ["tg/autorelease"]  # FIXME: testing
     tags: ["[0-9]+.[0-9]+.[0-9]+"]
 
 
@@ -16,7 +15,7 @@ jobs:
       - name: Compare version to ref
         run: |
           VERSION=$(uv tool run --from toml-cli toml get --toml-path=pyproject.toml project.version)
-          echo "${{ github.ref }} MOO $VERSION"
+          echo "Compare ${{ github.ref }} to refs/tags/$VERSION"
           if [[ "${{ github.ref }}" != "refs/tags/$VERSION" ]]; then
             exit 1
           fi
@@ -43,6 +42,12 @@ jobs:
       # Required for trusted publishing; see https://docs.pypi.org/trusted-publishers/using-a-publisher/
       id-token: write  
     steps:
-      - run: exit 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: astral-sh/setup-uv@v5
+      - run: uv publish --trusted-publishing always -v
 
 
