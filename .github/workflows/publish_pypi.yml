@@ -15,11 +15,11 @@ jobs:
       # Workaround; see https://github.com/astral-sh/uv/issues/6298
       - steps:
         - run: |
-          VERSION=$(uv tool run --from toml-cli toml get --toml-path=pyproject.toml project.version)
-          echo "{{ github.ref }}"
-          if [[ "{{ github.ref }}" != "refs/tags/$VERSION" ]]; then
-            exit 1
-          fi
+            VERSION=$(uv tool run --from toml-cli toml get --toml-path=pyproject.toml project.version)
+            echo "{{ github.ref }}"
+            if [[ "{{ github.ref }}" != "refs/tags/$VERSION" ]]; then
+              exit 1
+            fi
 
   call-ci:
     uses: ./.github/workflows/ci.yml
