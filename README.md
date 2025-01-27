@@ -31,7 +31,7 @@ It _does not_ aim to be fast. Speed isn't a current design goal.
 A JSON-like tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
 `float`, `str`, `bool` and `None`.
 
-An bream tree is a `dict` with some metadata and a payload; any valid JSON tree is a valid
+A bream document is a `dict` with some metadata and a payload; any valid JSON tree is a valid
 payload. For example:
 ```json
 {
