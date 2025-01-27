@@ -31,8 +31,7 @@ It _does not_ aim to be fast. Speed isn't a current design goal.
 A JSON-like tree is a nested combination of `dict` (with `str` keys only), `list`, `int`,
 `float`, `str`, `bool` and `None`.
 
-An bream tree is a `dict` with some metadata and a payload; any valid JSON tree is a valid
-payload. For example:
+A bream document is a `dict` with some metadata and a payload. For example:
 ```json
 {
     "_bream_spec": 1,
@@ -41,12 +40,11 @@ payload. For example:
     }
 }
 ```
-
-Any JSON tree is a valid bream payload.
+The payload will be a JSON-like tree, where every `dict` represents an encoded object.
 
 ## Encoded objects
-Certain JSON trees within a payload represent 'encoded' Python objects. Any such tree
-is a `dict` with a particular structure. Here's how `complex(0.123, 0.456)` might be
+Certain JSON trees represent 'encoded' Python objects. Any such tree is a
+`dict` with a particular structure. Here's how `complex(0.123, 0.456)` might be
 encoded:
 ```json
 {
@@ -64,7 +62,63 @@ The three top-level fields are special:
 - `_payload` is some JSON data (that may or may not be a dict).
 
 A `Coder` is an object which knows how to convert from the payload back to a Python
-object.
+object. For example, for the `complex` format above:
+```python
+@typing.final
+class ComplexCoder(bream.Coder[complex]):
+    """An demonstration coder for Python's `complex` type."""
+
+    @property
+    def version(self) -> int:
+        return 1
+
+    def encode(
+        self, value: complex, fmt: bream.SerialisationFormat
+    ) -> bream.EncodeError | bream.JsonType:
+        del fmt
+        return {"real": value.real, "imag": value.imag}
+
+    def decode(
+        self,
+        data: bream.JsonType,
+        fmt: bream.SerialisationFormat,
+        coder_version: int,
+        bream_spec: int,
+    ) -> bream.DecodeError | complex:
+        del bream_spec, fmt
+        if coder_version != 1:
+            return bream.core.UnsupportedCoderVersion(self, coder_version)
+        if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
+            return bream.core.InvalidPayloadData(self, data, "Invalid keys")
+        if not isinstance(data["real"], float):
+            return bream.core.InvalidPayloadData(self, data, "Invalid 'real'")
+        if not isinstance(data["imag"], float):
+            return bream.core.InvalidPayloadData(self, data, "Invalid 'imag'")
+        return complex(data["real"], data["imag"])
+````
+
+A `Coder` instance has a particular version associated with it. It is the
+responsibility of `Coder.decode` to be able to decode _older_ versions too, if
+possible.
+
+We tell bream to use particular `Coder`s for particular types by creating a
+`SerialisationFormat`. This lists all coders, and explicitly ties them to
+concrete types:
+```python
+bream.SerialisationFormat(
+    codecs=[
+        bream.Codec(
+            bream.TypeLabel("complex"),
+            bream.TypeSpec.from_type(complex),
+            coder_complex,
+        ),
+```
+
+A few notes:
+- the serialisation format is _not_ itself serialised. This is deliberate!
+- the choice of `TypeLabel` is arbitrary; it's just a name that shouldn't be changed within a serialisation format
+- the `TypeSpec` tells bream the module & name of the type. If a custom type is moved, this lets you reflect that and
+    not break serialised data (unlike pickled, which effectively serialises the type spec).
 
 
 ## Advantages of versioning
