@@ -110,16 +110,22 @@ bream.SerialisationFormat(
         bream.Codec(
             bream.TypeLabel("complex"),
             bream.TypeSpec.from_type(complex),
-            coder_complex,
+            ComplexCoder(),
         ),
 ```
 
 A few notes:
 - the serialisation format is _not_ itself serialised. This is deliberate!
-- the choice of `TypeLabel` is arbitrary; it's just a name that shouldn't be changed within a serialisation format
-- the `TypeSpec` tells bream the module & name of the type. If a custom type is moved, this lets you reflect that and
-    not break serialised data (unlike pickled, which effectively serialises the type spec).
+- the choice of `TypeLabel` is arbitrary; it's just a name that shouldn't be
+    changed within a serialisation format
+- the `TypeSpec` tells bream the module & name of the type. If a custom type is
+    moved, this lets you reflect that and not break serialised data (unlike
+    pickled, which effectively serialises the type spec).
 
+### Standard coders
+There are a selection of coders for Python built-in types under `bream.coders`.
+They must be included explicitly in your serialisation format if you want to
+use them.
 
 ## Advantages of versioning
 The main advantage of explicitly encoding & decoding your objects with bream is the
