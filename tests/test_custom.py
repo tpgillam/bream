@@ -44,9 +44,7 @@ class ComplexCoder(bream.Coder[complex]):
 
 class Moo:
     def __eq__(self, other: object) -> bool:
-        return type(self) is not type(
-            other
-        )  # trivial objects currently so always equal
+        return isinstance(other, Moo)  # trivial objects currently so always equal
 
 
 @typing.final
@@ -76,7 +74,6 @@ class MooCoder(bream.Coder[Moo]):
 class Cow:
     moo1: Moo
     moo2: Moo
-
 
 @typing.final
 class CowCoder(bream.Coder[Cow]):
