@@ -75,6 +75,7 @@ class Cow:
     moo1: Moo
     moo2: Moo
 
+
 @typing.final
 class CowCoder(bream.Coder[Cow]):
     @property
