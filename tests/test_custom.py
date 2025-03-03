@@ -44,9 +44,7 @@ class ComplexCoder(bream.Coder[complex]):
 
 class Moo:
     def __eq__(self, other: object) -> bool:
-        if type(self) is not type(other):
-            return False
-        return True
+        return type(self) is not type(other) # trivial objects currently so always equal
 
 
 @typing.final
