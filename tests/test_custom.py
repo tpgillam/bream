@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import typing
+from dataclasses import dataclass
 
 import pytest
 
 import bream
+from bream.core import InvalidPayloadData
 
 
 @typing.final
@@ -41,7 +43,8 @@ class ComplexCoder(bream.Coder[complex]):
 
 
 class Moo:
-    pass
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Moo)  # trivial objects currently so always equal
 
 
 @typing.final
@@ -65,6 +68,59 @@ class MooCoder(bream.Coder[Moo]):
     ) -> bream.DecodeError | Moo:
         del data, fmt, coder_version, bream_spec
         return Moo()
+
+
+@dataclass
+class Cow:
+    moo1: Moo
+    moo2: Moo
+
+
+@typing.final
+class CowCoder(bream.Coder[Cow]):
+    @property
+    def version(self) -> int:
+        return 1
+
+    def encode(
+        self, value: Cow, fmt: bream.SerialisationFormat
+    ) -> bream.EncodeError | bream.JsonType:
+        moo1 = bream.encode(value.moo1, fmt)
+        moo2 = bream.encode(value.moo2, fmt)
+        if isinstance(moo1, bream.EncodeError):
+            return moo1
+        if isinstance(moo2, bream.EncodeError):
+            return moo2
+
+        return {"moo1": moo1, "moo2": moo2}
+
+    def decode(
+        self,
+        data: bream.JsonType,
+        fmt: bream.SerialisationFormat,
+        coder_version: int,
+        bream_spec: int,
+    ) -> bream.DecodeError | Cow:
+        if coder_version != 1:
+            return bream.core.UnsupportedCoderVersion(self, coder_version)
+
+        match data:
+            case {"moo1": moo1, "moo2": moo2}:
+                moo1 = bream.decode(moo1, fmt, bream_spec)
+                moo2 = bream.decode(moo2, fmt, bream_spec)
+
+                match (moo1, moo2):
+                    case (Moo(), Moo()):
+                        return Cow(moo1=moo1, moo2=moo2)
+                    # handle double encode errors? List of errors?
+                    case (moo1, _) if isinstance(moo1, bream.DecodeError):
+                        return moo1
+                    case (_, moo2) if isinstance(moo2, bream.DecodeError):
+                        return moo2
+                    case _:
+                        return InvalidPayloadData(self, data, None)
+            case _:
+                return InvalidPayloadData(self, data, "Invalid keys")
 
 
 def test_custom_complex() -> None:
@@ -112,6 +168,24 @@ def test_serialization_format_find_coder() -> None:
     )
     assert _some(fmt.find_codec_for_value(0j)).coder is coder_complex
     assert _some(fmt.find_codec_for_value(Moo())).coder is coder_moo
+
+
+def test_serialization_format_with_nesting() -> None:
+    c = Cow(moo1=Moo(), moo2=Moo())
+    fmt = bream.SerialisationFormat(
+        codecs=[
+            bream.Codec(
+                bream.TypeLabel("cow"), bream.TypeSpec.from_type(Cow), CowCoder()
+            ),
+            bream.Codec(
+                bream.TypeLabel("moo"), bream.TypeSpec.from_type(Moo), MooCoder()
+            ),
+        ]
+    )
+    c_serialized = bream.encode(c, fmt)
+    assert not isinstance(c_serialized, bream.EncodeError)
+    c_deserialized = bream.decode(c_serialized, fmt, bream_spec=0)
+    assert c == c_deserialized
 
 
 def test_serialization_format_raises_for_json_codec() -> None:
