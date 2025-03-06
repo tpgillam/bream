@@ -4,9 +4,7 @@ from bream import coders, core
 from bream.core import (
     Codec,
     Coder,
-    DecodeError,
     Document,
-    EncodeError,
     JsonType,
     SerialisationFormat,
     TypeLabel,
@@ -20,9 +18,7 @@ from bream.core import (
 __all__ = [
     "Codec",
     "Coder",
-    "DecodeError",
     "Document",
-    "EncodeError",
     "JsonType",
     "SerialisationFormat",
     "TypeLabel",

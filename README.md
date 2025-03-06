@@ -72,9 +72,7 @@ class ComplexCoder(bream.Coder[complex]):
     def version(self) -> int:
         return 1
 
-    def encode(
-        self, value: complex, fmt: bream.SerialisationFormat
-    ) -> bream.EncodeError | bream.JsonType:
+    def encode(self, value: complex, fmt: bream.SerialisationFormat) -> bream.JsonType:
         del fmt
         return {"real": value.real, "imag": value.imag}
 
@@ -84,16 +82,16 @@ class ComplexCoder(bream.Coder[complex]):
         fmt: bream.SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> bream.DecodeError | complex:
+    ) -> complex:
         del bream_spec, fmt
         if coder_version != 1:
-            return bream.core.UnsupportedCoderVersion(self, coder_version)
+            raise bream.core.UnsupportedCoderVersionError(self, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return bream.core.InvalidPayloadData(self, data, "Invalid keys")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return bream.core.InvalidPayloadData(self, data, "Invalid 'real'")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return bream.core.InvalidPayloadData(self, data, "Invalid 'imag'")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
 ````
 
