@@ -79,9 +79,10 @@ class CowCoder(bream.Coder[Cow]):
         return 1
 
     def encode(self, value: Cow, fmt: bream.SerialisationFormat) -> bream.JsonType:
-        moo1 = bream.encode(value.moo1, fmt)
-        moo2 = bream.encode(value.moo2, fmt)
-        return {"moo1": moo1, "moo2": moo2}
+        return {
+            "moo1": bream.encode(value.moo1, fmt),
+            "moo2": bream.encode(value.moo2, fmt),
+        }
 
     def decode(
         self,
