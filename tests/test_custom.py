@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 
 import bream
-from bream.core import InvalidPayloadData
+from bream.core import InvalidPayloadDataError
 
 
 @typing.final
@@ -17,9 +17,7 @@ class ComplexCoder(bream.Coder[complex]):
     def version(self) -> int:
         return 1
 
-    def encode(
-        self, value: complex, fmt: bream.SerialisationFormat
-    ) -> bream.EncodeError | bream.JsonType:
+    def encode(self, value: complex, fmt: bream.SerialisationFormat) -> bream.JsonType:
         del fmt
         return {"real": value.real, "imag": value.imag}
 
@@ -29,16 +27,16 @@ class ComplexCoder(bream.Coder[complex]):
         fmt: bream.SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> bream.DecodeError | complex:
+    ) -> complex:
         del bream_spec, fmt
         if coder_version != 1:
-            return bream.core.UnsupportedCoderVersion(self, coder_version)
+            raise bream.core.UnsupportedCoderVersionError(self, coder_version)
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            return bream.core.InvalidPayloadData(self, data, "Invalid keys")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid keys")
         if not isinstance(data["real"], float):
-            return bream.core.InvalidPayloadData(self, data, "Invalid 'real'")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'real'")
         if not isinstance(data["imag"], float):
-            return bream.core.InvalidPayloadData(self, data, "Invalid 'imag'")
+            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'imag'")
         return complex(data["real"], data["imag"])
 
 
@@ -53,9 +51,7 @@ class MooCoder(bream.Coder[Moo]):
     def version(self) -> int:
         return 1
 
-    def encode(
-        self, value: Moo, fmt: bream.SerialisationFormat
-    ) -> bream.EncodeError | bream.JsonType:
+    def encode(self, value: Moo, fmt: bream.SerialisationFormat) -> bream.JsonType:
         del value, fmt
         return {}
 
@@ -65,7 +61,7 @@ class MooCoder(bream.Coder[Moo]):
         fmt: bream.SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> bream.DecodeError | Moo:
+    ) -> Moo:
         del data, fmt, coder_version, bream_spec
         return Moo()
 
@@ -82,16 +78,9 @@ class CowCoder(bream.Coder[Cow]):
     def version(self) -> int:
         return 1
 
-    def encode(
-        self, value: Cow, fmt: bream.SerialisationFormat
-    ) -> bream.EncodeError | bream.JsonType:
+    def encode(self, value: Cow, fmt: bream.SerialisationFormat) -> bream.JsonType:
         moo1 = bream.encode(value.moo1, fmt)
         moo2 = bream.encode(value.moo2, fmt)
-        if isinstance(moo1, bream.EncodeError):
-            return moo1
-        if isinstance(moo2, bream.EncodeError):
-            return moo2
-
         return {"moo1": moo1, "moo2": moo2}
 
     def decode(
@@ -100,9 +89,9 @@ class CowCoder(bream.Coder[Cow]):
         fmt: bream.SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> bream.DecodeError | Cow:
+    ) -> Cow:
         if coder_version != 1:
-            return bream.core.UnsupportedCoderVersion(self, coder_version)
+            raise bream.core.UnsupportedCoderVersionError(self, coder_version)
 
         match data:
             case {"moo1": moo1, "moo2": moo2}:
@@ -112,15 +101,10 @@ class CowCoder(bream.Coder[Cow]):
                 match (moo1, moo2):
                     case (Moo(), Moo()):
                         return Cow(moo1=moo1, moo2=moo2)
-                    # handle double encode errors? List of errors?
-                    case (moo1, _) if isinstance(moo1, bream.DecodeError):
-                        return moo1
-                    case (_, moo2) if isinstance(moo2, bream.DecodeError):
-                        return moo2
                     case _:
-                        return InvalidPayloadData(self, data, None)
+                        raise InvalidPayloadDataError(self, data, None)
             case _:
-                return InvalidPayloadData(self, data, "Invalid keys")
+                raise InvalidPayloadDataError(self, data, "Invalid keys")
 
 
 def test_custom_complex() -> None:
@@ -136,7 +120,6 @@ def test_custom_complex() -> None:
     x = 1 + 2j
     assert isinstance(x, complex)
     encoded_x = bream.encode(x, fmt)
-    assert not isinstance(encoded_x, bream.EncodeError)
     assert encoded_x == {
         "_type": "complex",
         "_version": 1,
@@ -183,7 +166,6 @@ def test_serialization_format_with_nesting() -> None:
         ]
     )
     c_serialized = bream.encode(c, fmt)
-    assert not isinstance(c_serialized, bream.EncodeError)
     c_deserialized = bream.decode(c_serialized, fmt, bream_spec=0)
     assert c == c_deserialized
 

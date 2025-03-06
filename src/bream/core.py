@@ -91,6 +91,21 @@ def _is_native_type(spec: TypeSpec) -> bool:
     return spec.module == "builtins" and spec.name in _NATIVE_TYPE_NAMES
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class UnsupportedCoderVersionError(Exception):
+    """The version requested for deserialisation is not supported."""
+
+    coder: Coder[Any]
+    version_provided: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class InvalidPayloadDataError(Exception):
+    coder: Coder[Any]
+    data: JsonType
+    msg: str | None
+
+
 class Coder[T](abc.ABC):
     """Encapsulate encoding & decoding for a type or types."""
 
@@ -133,6 +148,10 @@ class Coder[T](abc.ABC):
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
         and `bream_spec` with `bream.decode` to decode any child entities.
+
+        Raises:
+            UnsupportedCoderVersionError: if `coder_version` is not supported.
+            InvalidPayloadDataError: if `data` is malformed.
         """
 
 
