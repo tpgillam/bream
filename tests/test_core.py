@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 import bream
-from bream.core import EncodeError
 
 
 def test_scalar_encode() -> None:
@@ -24,9 +25,12 @@ def test_list_encode() -> None:
 
 def test_unsupported_encode() -> None:
     fmt = bream.SerialisationFormat(codecs=())
-    assert bream.encode(1j, fmt) == bream.core.NoEncoderAvailable(value=1j)
-    assert bream.encode((42,), fmt) == bream.core.NoEncoderAvailable(value=(42,))
-    assert bream.encode({3}, fmt) == bream.core.NoEncoderAvailable(value={3})
+    with pytest.raises(ValueError, match="No encoder for 1j"):
+        bream.encode(1j, fmt)
+    with pytest.raises(ValueError, match="No encoder for (42,)"):
+        bream.encode((42,), fmt)
+    with pytest.raises(ValueError, match="No encoder for {3}"):
+        bream.encode({3}, fmt)
 
 
 def test_scalar_decode() -> None:
