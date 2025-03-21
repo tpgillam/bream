@@ -91,68 +91,19 @@ def _is_native_type(spec: TypeSpec) -> bool:
     return spec.module == "builtins" and spec.name in _NATIVE_TYPE_NAMES
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class NoEncoderAvailable:
-    value: object
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class UnencodableDictKey:
-    value: object
-
-
-EncodeError = NoEncoderAvailable | UnencodableDictKey
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedBreamSpec:
-    """The bream spec specified for deserialisation is unsupported."""
-
-    bream_spec: int
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class NoDecoderAvailable:
-    """No decoder is available for the given type_label."""
-
-    type_label: TypeLabel
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedCoderVersion:
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class UnsupportedCoderVersionError(ValueError):
     """The version requested for deserialisation is not supported."""
 
     coder: Coder[Any]
     version_provided: int
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class InvalidCoderEncoded:
-    """Got an invalid structure that is similar to but not a `bream.CoderEncoded`."""
-
-    obj: dict[str, JsonType]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class InvalidPayloadData:
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class InvalidPayloadDataError(ValueError):
     coder: Coder[Any]
     data: JsonType
-    msg: str | None = None
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class InvalidJson:
-    data: object
-
-
-DecodeError = (
-    UnsupportedBreamSpec
-    | NoDecoderAvailable
-    | UnsupportedCoderVersion
-    | InvalidCoderEncoded
-    | InvalidPayloadData
-    | InvalidJson
-)
+    msg: str | None
 
 
 class Coder[T](abc.ABC):
@@ -178,13 +129,11 @@ class Coder[T](abc.ABC):
 
     # FIXME: open issue about avoiding cycles.
     @abc.abstractmethod
-    def encode(self, value: T, fmt: SerialisationFormat) -> EncodeError | JsonType:
+    def encode(self, value: T, fmt: SerialisationFormat) -> JsonType:
         """Encode `value` using this coder's current version.
 
         Note that this must encode recursively. Implementers should use `fmt` with
         `bream.encode` to encode any child entities.
-
-        Will return an `EncodeError` if encoding isn't possible.
         """
 
     @abc.abstractmethod
@@ -194,13 +143,15 @@ class Coder[T](abc.ABC):
         fmt: SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> DecodeError | T:
+    ) -> T:
         """Decode `data`, assuming it was encoded with `coder_version` of this coder.
 
         Note that `data` may contain other encoded types. Implementers should use `fmt`
         and `bream_spec` with `bream.decode` to decode any child entities.
 
-        Will return a `DecodeError` if decoding isn't possible.
+        Raises:
+            UnsupportedCoderVersionError: if `coder_version` is not supported.
+            InvalidPayloadDataError: if `data` is malformed.
         """
 
 
@@ -267,16 +218,13 @@ class SerialisationFormat:
         return self._label_to_codec.get(type_label)
 
 
-def encode_to_document(obj: object, fmt: SerialisationFormat) -> EncodeError | Document:
+def encode_to_document(obj: object, fmt: SerialisationFormat) -> Document:
     """Encode `obj`, and place inside an bream document."""
     payload = encode(obj, fmt)
-    if isinstance(payload, EncodeError):
-        return payload
-
     return {Keys.bream_spec.value: BREAM_SPEC, Keys.payload.value: payload}
 
 
-def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
+def encode(obj: object, fmt: SerialisationFormat) -> JsonType:
     if _is_native_element(obj):
         return obj
 
@@ -290,26 +238,17 @@ def encode(obj: object, fmt: SerialisationFormat) -> EncodeError | JsonType:
 
 
 # TODO: should these be Coders for builtins?
-def _encode_list(
-    obj: list[Any], fmt: SerialisationFormat
-) -> EncodeError | list[JsonType]:
-    result: list[JsonType] = []
-    for x in obj:
-        x_encoded = encode(x, fmt)
-        if isinstance(x_encoded, EncodeError):
-            return x_encoded
-        result.append(x_encoded)
-    return result
+def _encode_list(obj: list[Any], fmt: SerialisationFormat) -> list[JsonType]:
+    return [encode(x, fmt) for x in obj]
 
 
-def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | CoderEncoded:
+def _encode_custom(obj: object, fmt: SerialisationFormat) -> CoderEncoded:
     codec = fmt.find_codec_for_value(obj)
     if codec is None:
-        return NoEncoderAvailable(obj)
+        msg = f"No encoder for {obj}"
+        raise ValueError(msg)
 
     payload = codec.coder.encode(obj, fmt)
-    if isinstance(payload, EncodeError):
-        return payload
     return {
         Keys.type_label.value: codec.type_label,
         Keys.version.value: codec.coder.version,
@@ -317,19 +256,16 @@ def _encode_custom(obj: object, fmt: SerialisationFormat) -> EncodeError | Coder
     }
 
 
-def decode_document(
-    document: Document, fmt: SerialisationFormat
-) -> DecodeError | object:
+def decode_document(document: Document, fmt: SerialisationFormat) -> object:
     """Decode an bream document."""
     return decode(obj=document["_payload"], fmt=fmt, bream_spec=document["_bream_spec"])
 
 
-def decode(
-    obj: JsonType, fmt: SerialisationFormat, bream_spec: int
-) -> DecodeError | object:
+def decode(obj: JsonType, fmt: SerialisationFormat, bream_spec: int) -> object:
     # FIXME: version 0 should get a special error once we go stable.
     if bream_spec != 0:
-        return UnsupportedBreamSpec(bream_spec=bream_spec)
+        msg = f"Unsupported bream_spec: {bream_spec}"
+        raise ValueError(msg)
 
     if _is_native_element(obj):
         return obj
@@ -339,34 +275,28 @@ def decode(
 
     if type(obj) is dict:
         if not _is_coder_encoded(obj):
-            return InvalidCoderEncoded(obj)
+            msg = f"Invalid coder-encoded: {obj}"
+            raise ValueError(msg)
         return _decode_custom(obj, fmt, bream_spec)
 
-    return InvalidJson(obj)
+    msg = f"Invalid json: {obj}"
+    raise ValueError(msg)
 
 
 def _decode_list(
     obj: list[JsonType], fmt: SerialisationFormat, bream_spec: int
-) -> DecodeError | list[object]:
-    res: list[object] = []
-    for x in obj:
-        tmp = decode(x, fmt, bream_spec)
-        # FIXME: that we're not getting a linter error since the success path might just
-        # be an 'object'. We should probably use some kind of 'Result' type if avoiding
-        # exceptions.
-        if isinstance(tmp, DecodeError):
-            return tmp
-        res.append(x)
-    return res
+) -> list[object]:
+    return [decode(x, fmt, bream_spec) for x in obj]
 
 
 def _decode_custom(
     obj: CoderEncoded, fmt: SerialisationFormat, bream_spec: int
-) -> DecodeError | object:
+) -> object:
     type_label = obj[Keys.type_label.value]
     codec = fmt.find_codec_for_type_label(type_label)
     if codec is None:
-        return NoDecoderAvailable(type_label)
+        msg = f"No codec available for {type_label}"
+        raise ValueError(msg)
 
     version = obj[Keys.version.value]
     payload = obj[Keys.payload.value]

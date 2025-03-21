@@ -6,12 +6,10 @@ import typing
 
 from bream.core import (
     Coder,
-    DecodeError,
-    EncodeError,
-    InvalidPayloadData,
+    InvalidPayloadDataError,
     JsonType,
     SerialisationFormat,
-    UnsupportedCoderVersion,
+    UnsupportedCoderVersionError,
     decode,
     encode,
 )
@@ -25,45 +23,35 @@ class DictCoder(Coder[dict[object, object]]):
     def version(self) -> int:
         return 1
 
-    def encode(
-        self, value: dict[object, object], fmt: SerialisationFormat
-    ) -> EncodeError | JsonType:
-        data: list[JsonType] = []
-        for k, v in value.items():
-            encoded_k = encode(k, fmt)
-            if isinstance(encoded_k, EncodeError):
-                return encoded_k
-            encoded_v = encode(v, fmt)
-            if isinstance(encoded_v, EncodeError):
-                return encoded_v
-            data.append([encoded_k, encoded_v])
+    def encode(self, value: dict[object, object], fmt: SerialisationFormat) -> JsonType:
+        return [[encode(k, fmt), encode(v, fmt)] for k, v in value.items()]
 
-        return data
-
-    def decode(  # noqa: PLR0911
+    def decode(
         self,
         data: JsonType,
         fmt: SerialisationFormat,
         coder_version: int,
         bream_spec: int,
-    ) -> DecodeError | dict[object, object]:
+    ) -> dict[object, object]:
         if coder_version != 1:
-            return UnsupportedCoderVersion(self, coder_version)
+            raise UnsupportedCoderVersionError(
+                coder=self, version_provided=coder_version
+            )
         if type(data) is not list:
-            return InvalidPayloadData(self, data)
+            msg = f"Invalid payload data: {self}, {data}"
+            raise ValueError(msg)
         result: dict[object, object] = {}
         for encoded_item in data:
             if not (isinstance(encoded_item, list) and len(encoded_item) == 2):
-                return InvalidPayloadData(self, data, f"Invalid item: {encoded_item}")
+                raise InvalidPayloadDataError(
+                    coder=self, data=data, msg=f"bad item: {encoded_item}"
+                )
             encoded_k, encoded_v = encoded_item
             k = decode(encoded_k, fmt, bream_spec)
-            if isinstance(k, DecodeError):
-                return k
             if k in result:
-                return InvalidPayloadData(self, data, f"Duplicate key: {k}")
-            v = decode(encoded_v, fmt, bream_spec)
-            if isinstance(v, DecodeError):
-                return v
-            result[k] = v
+                raise InvalidPayloadDataError(
+                    coder=self, data=data, msg=f"duplicate key: {k}"
+                )
+            result[k] = decode(encoded_v, fmt, bream_spec)
 
         return result

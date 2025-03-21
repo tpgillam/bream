@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
+import pytest
+
 import bream
-from bream.core import EncodeError
 
 
 def test_scalar_encode() -> None:
@@ -24,9 +26,12 @@ def test_list_encode() -> None:
 
 def test_unsupported_encode() -> None:
     fmt = bream.SerialisationFormat(codecs=())
-    assert bream.encode(1j, fmt) == bream.core.NoEncoderAvailable(value=1j)
-    assert bream.encode((42,), fmt) == bream.core.NoEncoderAvailable(value=(42,))
-    assert bream.encode({3}, fmt) == bream.core.NoEncoderAvailable(value={3})
+    with pytest.raises(ValueError, match="No encoder for 1j"):
+        bream.encode(1j, fmt)
+    with pytest.raises(ValueError, match=re.escape("No encoder for (42,)")):
+        bream.encode((42,), fmt)
+    with pytest.raises(ValueError, match=re.escape("No encoder for {3}")):
+        bream.encode({3}, fmt)
 
 
 def test_scalar_decode() -> None:
@@ -52,7 +57,6 @@ def test_nested_structure_round_trip() -> None:
     x = [None, 2, 4.2, "moo"]
     y = ["a", None, x]
     y_encoded = bream.encode(y, fmt)
-    assert not isinstance(y_encoded, EncodeError)
     assert y_encoded == y
     assert y_encoded is not y
     y_decoded = bream.decode(y_encoded, fmt, bream.core.BREAM_SPEC)
@@ -64,7 +68,6 @@ def test_simple_document_round_trip() -> None:
     fmt = bream.SerialisationFormat(codecs=())
     for x in (None, 2, 4.2, "moo", [1, None, 3], ["a", [3, 4], "b", ["c", 4.2]]):
         document = bream.encode_to_document(x, fmt)
-        assert not isinstance(document, bream.EncodeError)
         assert document == {"_bream_spec": bream.core.BREAM_SPEC, "_payload": x}
         new_x = bream.decode_document(document, fmt)
         assert new_x == x
@@ -84,8 +87,8 @@ def test_float_subtype_not_accepted() -> None:
     fmt = bream.SerialisationFormat(codecs=())
     x = _MyFloat(1)
     assert isinstance(x, float)
-    x_encoded = bream.encode(x, fmt)
-    assert x_encoded == bream.core.NoEncoderAvailable(x)
+    with pytest.raises(ValueError, match=re.escape(f"No encoder for {x}")):
+        bream.encode(x, fmt)
 
 
 class _MyList(list[Any]):
@@ -96,5 +99,5 @@ def test_list_subtype_not_accepted() -> None:
     fmt = bream.SerialisationFormat(codecs=())
     x = _MyList([1, 2, 3])
     assert isinstance(x, list)
-    x_encoded = bream.encode(x, fmt)
-    assert x_encoded == bream.core.NoEncoderAvailable(x)
+    with pytest.raises(ValueError, match=re.escape(f"No encoder for {x}")):
+        bream.encode(x, fmt)
