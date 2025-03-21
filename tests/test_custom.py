@@ -30,13 +30,21 @@ class ComplexCoder(bream.Coder[complex]):
     ) -> complex:
         del bream_spec, fmt
         if coder_version != 1:
-            raise bream.core.UnsupportedCoderVersionError(self, coder_version)
+            raise bream.core.UnsupportedCoderVersionError(
+                coder=self, version_provided=coder_version
+            )
         if not isinstance(data, dict) or data.keys() != {"real", "imag"}:
-            raise bream.core.InvalidPayloadDataError(self, data, "Invalid keys")
+            raise bream.core.InvalidPayloadDataError(
+                coder=self, data=data, msg="Invalid keys"
+            )
         if not isinstance(data["real"], float):
-            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'real'")
+            raise bream.core.InvalidPayloadDataError(
+                coder=self, data=data, msg="Invalid 'real'"
+            )
         if not isinstance(data["imag"], float):
-            raise bream.core.InvalidPayloadDataError(self, data, "Invalid 'imag'")
+            raise bream.core.InvalidPayloadDataError(
+                coder=self, data=data, msg="Invalid 'imag'"
+            )
         return complex(data["real"], data["imag"])
 
 
@@ -92,7 +100,9 @@ class CowCoder(bream.Coder[Cow]):
         bream_spec: int,
     ) -> Cow:
         if coder_version != 1:
-            raise bream.core.UnsupportedCoderVersionError(self, coder_version)
+            raise bream.core.UnsupportedCoderVersionError(
+                coder=self, version_provided=coder_version
+            )
 
         match data:
             case {"moo1": moo1, "moo2": moo2}:
@@ -103,9 +113,9 @@ class CowCoder(bream.Coder[Cow]):
                     case (Moo(), Moo()):
                         return Cow(moo1=moo1, moo2=moo2)
                     case _:
-                        raise InvalidPayloadDataError(self, data, None)
+                        raise InvalidPayloadDataError(coder=self, data=data, msg=None)
             case _:
-                raise InvalidPayloadDataError(self, data, "Invalid keys")
+                raise InvalidPayloadDataError(coder=self, data=data, msg="Invalid keys")
 
 
 def test_custom_complex() -> None:

@@ -91,16 +91,16 @@ def _is_native_type(spec: TypeSpec) -> bool:
     return spec.module == "builtins" and spec.name in _NATIVE_TYPE_NAMES
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class UnsupportedCoderVersionError(Exception):
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class UnsupportedCoderVersionError(ValueError):
     """The version requested for deserialisation is not supported."""
 
     coder: Coder[Any]
     version_provided: int
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class InvalidPayloadDataError(Exception):
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class InvalidPayloadDataError(ValueError):
     coder: Coder[Any]
     data: JsonType
     msg: str | None
